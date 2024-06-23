@@ -1,7 +1,7 @@
-// frontend/pages/_app.js
+// D:\OLS\frontend\pages\_app.js
+import "../src/app/globals.css"; // 确保这个路径正确
 import { Provider } from "react-redux";
 import store from "../store/store";
-// import "../styles/globals.css"; // 如果你有全局样式
 
 function MyApp({ Component, pageProps }) {
   return (
