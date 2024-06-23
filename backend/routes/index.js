@@ -1,11 +1,9 @@
-// frontend/pages/home.js
-import Link from "next/link";
+const express = require("express");
+const router = express.Router();
+const Link = require("next/link"); // 将 import 替换为 require
 
-export default function Home() {
-  return (
-    <div>
-      <h1>Home Page</h1>
-      <Link href="/about">Go to About Page</Link>
-    </div>
-  );
-}
+router.get("/", function (req, res, next) {
+  res.send("Hello World");
+});
+
+module.exports = router;
