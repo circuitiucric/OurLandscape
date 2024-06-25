@@ -24,10 +24,10 @@ const Home: React.FC = () => {
   const login = async () => {
     try {
       const response = await axios.post("http://localhost:3001/login", {
-        username: username,
-        password: password,
+        userName: username,
+        passWord: password,
       });
-      setMessage(response.data.message);
+      setMessage(response.data.msg);
     } catch (error) {
       console.error(error);
       setMessage("登录失败");
