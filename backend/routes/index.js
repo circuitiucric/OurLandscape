@@ -1,33 +1,20 @@
 const express = require("express");
-const bodyParser = require("body-parser");
-const jwt = require("jsonwebtoken");
-const mysql = require("mysql");
-
 const router = express.Router();
+const jwt = require("jsonwebtoken");
+const mysql = require("mysql2");
 
 const conn = mysql.createConnection({
   host: "127.0.0.1",
   user: "root",
-  password: "root",
+  password: "xxhhqq007",
   database: "react-pro",
   multipleStatements: true,
 });
 
-router.use(bodyParser.urlencoded({ extended: false }));
-router.use(bodyParser.json());
-
-// 解决跨域
-router.all("*", function (req, res, next) {
-  res.header("Access-Control-Allow-Origin", "*");
-  res.header("Access-Control-Allow-Headers", "Content-Type");
-  res.header("Access-Control-Allow-Methods", "*");
-  res.header("Content-Type", "application/json;charset=utf-8");
-  next();
-});
-
-// 用户注册
+// 注册端口
 router.post("/register", (req, res) => {
-  const { userName, passWord } = req.body;
+  var userName = req.body.userName;
+  var passWord = req.body.passWord;
   if (!userName || !passWord) {
     res.send({
       code: 0,
@@ -40,10 +27,9 @@ router.post("/register", (req, res) => {
     conn.query(result, [userName], (err, results) => {
       if (err) throw err;
       if (results.length >= 1) {
-        // 如果有相同用户名，则注册失败，用户名重复
         res.send({ code: 0, msg: "注册失败，用户名重复" });
       } else {
-        const sqlStr = "INSERT INTO users(userName, passWord) VALUES(?, ?)";
+        const sqlStr = "INSERT INTO users(userName,passWord) VALUES(?,?)";
         conn.query(sqlStr, [userName, passWord], (err, results) => {
           if (err) throw err;
           if (results.affectedRows === 1) {
@@ -55,24 +41,37 @@ router.post("/register", (req, res) => {
       }
     });
   }
-
   console.log("接收", req.body);
 });
 
-// 用户登录
+// 登录端口
 router.post("/login", (req, res) => {
-  const { username, password } = req.body;
-  const sql = "SELECT * FROM users WHERE username = ? AND password = ?";
-  conn.query(sql, [username, password], (err, results) => {
-    if (err) {
-      res.status(500).json({ error: err.message });
-    } else if (results.length > 0) {
-      const token = jwt.sign({ id: results[0].id }, process.env.JWT_SECRET, {
-        expiresIn: "1h",
-      });
-      res.status(200).json({ message: "Login successful!", token });
+  var userName = req.body.userName;
+  var passWord = req.body.passWord;
+  if (!userName || !passWord) {
+    res.send({
+      code: 0,
+      msg: "用户名与密码为必传参数...",
+    });
+    return;
+  }
+  const sqlStr = "SELECT * FROM users WHERE userName=? AND passWord=?";
+  conn.query(sqlStr, [userName, passWord], (err, result) => {
+    if (err) throw err;
+    if (result.length > 0) {
+      // 生成token
+      var token = jwt.sign(
+        {
+          identity: result[0].identity,
+          userName: result[0].userName,
+        },
+        "secret",
+        { expiresIn: "1h" }
+      );
+      console.log(token);
+      res.send({ code: 1, msg: "登录成功", token: token });
     } else {
-      res.status(401).json({ message: "Invalid credentials" });
+      res.send({ code: 0, msg: "登录失败" });
     }
   });
 });
