@@ -18,3 +18,16 @@ const config: Config = {
   plugins: [],
 };
 export default config;
+
+//自定义背景图像
+module.exports = {
+  content: ["./src/**/*.{js,jsx,ts,tsx}"],
+  theme: {
+    extend: {
+      backgroundImage: {
+        "custom-bg": "url('/images/background.jpg')", // 替换为实际背景图像的路径
+      },
+    },
+  },
+  plugins: [],
+};
