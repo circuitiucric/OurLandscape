@@ -1,30 +1,29 @@
 "use client";
-
 import React from "react";
-import Link from "next/link";
+import { Worker, Viewer } from "@react-pdf-viewer/core";
+import "@react-pdf-viewer/core/lib/styles/index.css";
+import { defaultLayoutPlugin } from "@react-pdf-viewer/default-layout";
+import "@react-pdf-viewer/default-layout/lib/styles/index.css";
 import { useSearchParams } from "next/navigation";
 
-const PdfViewer: React.FC = () => {
+const PdfViewer = () => {
   const searchParams = useSearchParams();
+  const file = searchParams ? searchParams.get("file") : null;
+  const fileUrl = file ? `/pdf/${file}` : null;
 
-  // 如果 searchParams 为空，则返回一个错误信息
-  if (!searchParams) {
-    return <div>Invalid search parameters</div>;
-  }
-
-  const file = searchParams.get("file");
-
-  if (!file) {
-    return <div>No PDF file specified</div>;
-  }
-
-  const pdfUrl = `http://localhost:3001/pdf/${decodeURIComponent(file)}`;
+  const defaultLayoutPluginInstance = defaultLayoutPlugin();
 
   return (
-    <div>
-      <h1>PDF Viewer</h1>
-      <iframe src={pdfUrl} width="100%" height="600px" />
-      <Link href="/select-pdf">Back to PDF list</Link>
+    <div style={{ height: "100vh" }}>
+      <Worker
+        workerUrl={`https://unpkg.com/pdfjs-dist@3.0.279/build/pdf.worker.min.js`}
+      >
+        {fileUrl ? (
+          <Viewer fileUrl={fileUrl} plugins={[defaultLayoutPluginInstance]} />
+        ) : (
+          <div>文件未找到或未指定。</div>
+        )}
+      </Worker>
     </div>
   );
 };

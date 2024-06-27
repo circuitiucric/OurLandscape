@@ -36,10 +36,13 @@
     }
   },
   "dependencies": {
+    "@react-pdf-viewer/core": "^3.12.0",
+    "@react-pdf-viewer/default-layout": "^3.12.0",
     "autoprefixer": "^10.4.19",
     "axios": "^1.7.2",
     "express": "^4.19.2",
     "next": "^14.2.4",
+    "pdfjs-dist": "^3.0.279",
     "postcss": "^8.4.38",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",

@@ -93,17 +93,18 @@ router.get("/pdfs", (req, res) => {
   });
 });
 
-// 提供PDF文件的端口
+// 提供单个 PDF 文件的端口
 router.get("/pdf/:filename", (req, res) => {
-  const filename = req.params.filename;
-  const filePath = path.join(__dirname, "../public/pdf", filename);
+  const pdfDir = path.join(__dirname, "../public/pdf");
+  const filePath = path.join(pdfDir, req.params.filename);
 
-  if (fs.existsSync(filePath)) {
-    res.setHeader("Content-Type", "application/pdf");
-    fs.createReadStream(filePath).pipe(res);
-  } else {
-    res.status(404).send("File not found");
-  }
+  res.setHeader("Content-Type", "application/pdf");
+  res.sendFile(filePath, (err) => {
+    if (err) {
+      console.error("Error sending PDF file:", err);
+      res.status(404).send("PDF file not found");
+    }
+  });
 });
 
 module.exports = router;
