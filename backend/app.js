@@ -1,6 +1,7 @@
 const express = require("express");
 const bodyParser = require("body-parser");
 const app = express();
+const path = require("path");
 const indexRouter = require("./routes/index");
 
 // 使用 bodyParser 中间件
@@ -15,6 +16,9 @@ app.use((req, res, next) => {
   res.header("Content-Type", "application/json;charset=utf-8");
   next();
 });
+
+// 提供静态文件服务
+app.use("/pdf", express.static(path.join(__dirname, "public", "pdf")));
 
 // 使用路由
 app.use("/", indexRouter);
