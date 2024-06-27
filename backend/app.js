@@ -16,8 +16,28 @@ app.use((req, res, next) => {
   next();
 });
 
+// 设置静态文件服务
 app.use("/pdf", express.static(path.join(__dirname, "public", "pdf")));
+console.log(
+  "Serving static files from:",
+  path.join(__dirname, "public", "pdf")
+);
 
+// 路由处理
 app.use("/", indexRouter);
+
+// 添加日志输出，以确认请求路径和文件名
+app.get("/pdf/:filename", (req, res) => {
+  const filePath = path.join(__dirname, "public", "pdf", req.params.filename);
+  console.log("Requested file:", filePath);
+  res.sendFile(filePath, (err) => {
+    if (err) {
+      console.error("Error sending file:", err);
+      res.status(err.status).end();
+    } else {
+      console.log("File sent successfully:", filePath);
+    }
+  });
+});
 
 module.exports = app;

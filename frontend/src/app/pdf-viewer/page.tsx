@@ -1,5 +1,5 @@
 "use client";
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { Worker, Viewer } from "@react-pdf-viewer/core";
 import "@react-pdf-viewer/core/lib/styles/index.css";
 import { defaultLayoutPlugin } from "@react-pdf-viewer/default-layout";
@@ -8,21 +8,36 @@ import { useSearchParams } from "next/navigation";
 
 const PdfViewer = () => {
   const searchParams = useSearchParams();
-  const file = searchParams ? searchParams.get("file") : null;
-  const fileUrl = file ? `/pdf/${file}` : null;
+  const file = searchParams?.get("file"); // 使用可选链操作符处理 null 情况
+  const fileUrl = `http://localhost:3001/pdf/${file}`;
 
   const defaultLayoutPluginInstance = defaultLayoutPlugin();
+
+  useEffect(() => {
+    console.log("Fetching PDF file from:", fileUrl);
+    fetch(fileUrl)
+      .then((response) => {
+        if (response.ok) {
+          console.log("PDF file fetched successfully:", fileUrl);
+        } else {
+          console.error(
+            "Failed to fetch PDF file:",
+            response.status,
+            response.statusText
+          );
+        }
+      })
+      .catch((error) => {
+        console.error("Error fetching PDF file:", error);
+      });
+  }, [fileUrl]);
 
   return (
     <div style={{ height: "100vh" }}>
       <Worker
         workerUrl={`https://unpkg.com/pdfjs-dist@3.0.279/build/pdf.worker.min.js`}
       >
-        {fileUrl ? (
-          <Viewer fileUrl={fileUrl} plugins={[defaultLayoutPluginInstance]} />
-        ) : (
-          <div>文件未找到或未指定。</div>
-        )}
+        <Viewer fileUrl={fileUrl} plugins={[defaultLayoutPluginInstance]} />
       </Worker>
     </div>
   );
