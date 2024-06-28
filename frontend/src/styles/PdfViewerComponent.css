@@ -1,0 +1,11 @@
+<!--添加样式以确保批注和 PDF 页面正确显示：-- > .page-container {
+  display: flex;
+  justify-content: center;
+  position: relative;
+}
+
+.annotation {
+  background: yellow;
+  padding: 5px;
+  border: 1px solid black;
+}
