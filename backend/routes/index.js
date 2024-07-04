@@ -9,7 +9,7 @@ const conn = mysql.createConnection({
   host: "127.0.0.1",
   user: "root",
   password: "xxhhqq007",
-  database: "react-pro",
+  database: "pdf_website",
   multipleStatements: true,
 });
 
@@ -107,4 +107,33 @@ router.get("/pdf/:filename", (req, res) => {
   });
 });
 
+// 获取所有批注
+router.get("/api/annotations", (req, res) => {
+  const sql = "SELECT * FROM annotations";
+  conn.query(sql, (err, results) => {
+    if (err) {
+      console.error(err);
+      res.status(500).json({ error: "Internal server error" });
+    } else {
+      res.json(results);
+    }
+  });
+});
+
+// 添加新的批注
+router.post("/api/annotations", (req, res) => {
+  const { pdfFile, pageNumber, text } = req.body;
+  const sql =
+    "INSERT INTO annotations (pdf_file, page_number, text) VALUES (?, ?, ?)";
+  conn.query(sql, [pdfFile, pageNumber, text], (err, result) => {
+    if (err) {
+      console.error(err);
+      res.status(500).json({ error: "Internal server error" });
+    } else {
+      res.status(201).json({ id: result.insertId, pdfFile, pageNumber, text });
+    }
+  });
+});
+
+module.exports = router;
 module.exports = router;

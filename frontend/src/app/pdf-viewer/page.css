@@ -1,0 +1,21 @@
+.pdfViewer {
+  position: relative;
+}
+
+.annotation {
+  position: absolute;
+  background-color: yellow;
+  padding: 5px;
+  border: 1px solid black;
+  border-radius: 5px;
+  z-index: 1000;
+}
+
+@keyframes move {
+  0% {
+    left: 100%;
+  }
+  100% {
+    left: -100%;
+  }
+}
