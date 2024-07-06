@@ -1,4 +1,5 @@
-//登陆注册页面
+// src/app/login/page.tsx
+
 "use client";
 
 import React, { useState } from "react";
@@ -6,16 +7,15 @@ import axios from "axios";
 import { useRouter } from "next/navigation";
 
 const Home: React.FC = () => {
-  const [username, setUsername] = useState("");
+  const [userName, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [message, setMessage] = useState("");
   const router = useRouter();
 
-  //点击注册按钮时，前端将用户名和密码发送到后端的 /register 端点
   const register = async () => {
     try {
       const response = await axios.post("http://localhost:3001/register", {
-        userName: username,
+        userName: userName,
         passWord: password,
       });
       setMessage(response.data.msg);
@@ -25,15 +25,15 @@ const Home: React.FC = () => {
     }
   };
 
-  //点击登录按钮时，前端将用户名和密码发送到后端的 /login 端点
   const login = async () => {
     try {
       const response = await axios.post("http://localhost:3001/login", {
-        userName: username,
+        userName: userName,
         passWord: password,
       });
       setMessage(response.data.msg);
       if (response.data.code === 1) {
+        localStorage.setItem("token", response.data.token);
         router.push("/select-pdf");
       }
     } catch (error) {
@@ -49,7 +49,7 @@ const Home: React.FC = () => {
       <input
         type="text"
         placeholder="用户名"
-        value={username}
+        value={userName}
         onChange={(e) => setUsername(e.target.value)}
         className="mb-4 p-2 border border-gray-300 rounded text-black"
       />

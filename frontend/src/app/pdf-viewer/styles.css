@@ -1,0 +1,13 @@
+/* src/app/pdf-viewer/styles.css */
+
+.annotation-column {
+  width: 300px;
+  overflow-y: auto;
+  background-color: #f0f0f0;
+}
+
+.annotation {
+  background-color: yellow;
+  margin-bottom: 10px;
+  padding: 5px;
+}
