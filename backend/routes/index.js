@@ -20,11 +20,6 @@ app.use(express.urlencoded({ extended: false })); // 使用 express 内置的 UR
 
 app.use(express.static(path.join(__dirname, "public")));
 
-const port = process.env.PORT || 3001;
-app.listen(port, () => {
-  console.log(`Listening on port ${port}`);
-});
-
 const jwtSecret = process.env.JWT_SECRET;
 if (!jwtSecret) {
   throw new Error("JWT_SECRET is not defined");
