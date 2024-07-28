@@ -19,6 +19,13 @@
     ],
     "strictNullChecks": true
   },
-  "include": ["next-env.d.ts", ".next/types/**/*.ts", "**/*.ts", "**/*.tsx"],
+  "include": [
+    "next-env.d.ts",
+    ".next/types/**/*.ts",
+    "**/*.ts",
+    "**/*.tsx",
+    "pages/api/threads/[id].ts",
+    "pages/api/threads/[id]/replies.ts"
+  ],
   "exclude": ["node_modules"]
 }

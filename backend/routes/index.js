@@ -6,6 +6,7 @@ const fs = require("fs");
 const cors = require("cors");
 require("dotenv").config();
 
+const threadsRouter = require("./threads");
 const app = express();
 
 const corsOptions = {
@@ -158,5 +159,7 @@ app.post("/api/annotations", (req, res) => {
     res.status(401).json({ error: "Unauthorized" });
   }
 });
+
+app.use("/api/threads", threadsRouter);
 
 module.exports = app;

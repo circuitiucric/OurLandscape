@@ -18,6 +18,7 @@
     }
   },
   "dependencies": {
+    "@prisma/client": "^5.17.0",
     "@react-pdf-viewer/core": "^3.12.0",
     "@react-pdf-viewer/default-layout": "^3.12.0",
     "autoprefixer": "^10.4.19",
@@ -26,6 +27,7 @@
     "next": "^14.2.4",
     "pdfjs-dist": "^3.11.174",
     "postcss": "^8.4.38",
+    "prisma": "^5.17.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-redux": "^9.1.2",

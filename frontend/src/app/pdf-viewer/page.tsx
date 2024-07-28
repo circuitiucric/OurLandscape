@@ -1,4 +1,3 @@
-// src/app/pdf-viewer/page.tsx
 "use client";
 import React, { useEffect, useRef, useState } from "react";
 import { Worker, Viewer } from "@react-pdf-viewer/core";
@@ -7,6 +6,7 @@ import { defaultLayoutPlugin } from "@react-pdf-viewer/default-layout";
 import "@react-pdf-viewer/default-layout/lib/styles/index.css";
 import { useSearchParams } from "next/navigation";
 import axios from "axios";
+import { useRouter } from "next/navigation";
 
 interface Annotation {
   id?: number;
@@ -20,6 +20,7 @@ const PdfViewer = () => {
   const searchParams = useSearchParams();
   const file = searchParams?.get("file");
   const fileUrl = `http://localhost:3001/pdf/${file}`;
+  const router = useRouter();
 
   const defaultLayoutPluginInstance = defaultLayoutPlugin();
 
@@ -27,7 +28,6 @@ const PdfViewer = () => {
   const [currentPage, setCurrentPage] = useState<number>(1);
   const annotationInputRef = useRef<HTMLInputElement | null>(null);
 
-  // 修改批注获取逻辑，统一字段名
   useEffect(() => {
     console.log("Fetching PDF file from:", fileUrl);
     fetch(fileUrl)
@@ -46,19 +46,18 @@ const PdfViewer = () => {
         console.error("Error fetching PDF file:", error);
       });
 
-    // 获取批注
     axios
       .get(`http://localhost:3001/api/annotations?pdfFile=${file}`)
       .then((response) => {
         const fetchedAnnotations = response.data.map((annotation) => ({
           id: annotation.id,
-          pdfFile: annotation.pdf_file, // 保证字段名一致
-          pageNumber: annotation.page_number, // 保证字段名一致
+          pdfFile: annotation.pdf_file,
+          pageNumber: annotation.page_number,
           text: annotation.text,
-          userName: annotation.user_name,
+          userName: annotation.userName,
           createdAt: annotation.created_at,
         }));
-        console.log("Fetched annotations:", fetchedAnnotations);
+        console.log("Fetched annotations:", fetchedAnnotations); // Log fetched annotations
         setAnnotations(fetchedAnnotations);
       })
       .catch((error) => {
@@ -74,8 +73,14 @@ const PdfViewer = () => {
     }
 
     const text = annotationInputRef.current?.value;
+    const userName = "currentUser"; // Replace with actual current user
     if (text) {
-      const newAnnotation = { pdfFile: file, pageNumber: currentPage, text };
+      const newAnnotation = {
+        pdfFile: file,
+        pageNumber: currentPage,
+        text,
+        userName,
+      };
 
       axios
         .post("http://localhost:3001/api/annotations", newAnnotation, {
@@ -103,14 +108,30 @@ const PdfViewer = () => {
     console.log("Current page:", pageNumber);
   };
 
-  useEffect(() => {
-    console.log("Current page changed to:", currentPage);
-    console.log("Annotations before filtering:", annotations);
-    const pageAnnotations = annotations.filter(
-      (annotation) => annotation.pageNumber === currentPage
-    );
-    console.log("Annotations for current page:", pageAnnotations);
-  }, [currentPage, annotations]);
+  const handleAnnotationDoubleClick = async (annotationId: number) => {
+    try {
+      const response = await axios.get(
+        `http://localhost:3001/api/threads?annotationId=${annotationId}`
+      );
+      const thread = response.data;
+
+      if (thread) {
+        router.push(`/post-details/${thread.id}`);
+      } else {
+        const newThread = await axios.post(
+          `http://localhost:3001/api/threads`,
+          {
+            annotationId,
+            content: "新的帖子内容", // 可根据需要修改
+            userName: "currentUser", // 替换为当前登录用户
+          }
+        );
+        router.push(`/post-details/${newThread.data.id}`);
+      }
+    } catch (error) {
+      console.error("Error handling annotation double click:", error);
+    }
+  };
 
   return (
     <div style={{ display: "flex", height: "100vh" }}>
@@ -141,8 +162,10 @@ const PdfViewer = () => {
             <div
               key={annotation.id}
               style={{ backgroundColor: "yellow", marginBottom: "5px" }}
+              onDoubleClick={() => handleAnnotationDoubleClick(annotation.id!)}
             >
-              {annotation.text} - {annotation.userName}
+              {annotation.text} - {annotation.userName}{" "}
+              {/* Log the rendered annotation */}
             </div>
           ))}
       </div>

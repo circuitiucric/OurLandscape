@@ -68,4 +68,19 @@ router.post("/", (req, res) => {
   });
 });
 
+//获取单个批注
+router.get("/:id", (req, res) => {
+  const annotationId = req.params.id;
+  db.query(
+    "SELECT content FROM annotations WHERE id = ?",
+    [annotationId],
+    (err, results) => {
+      if (err) {
+        return res.status(500).json({ error: "Error fetching annotation" });
+      }
+      res.json(results[0]);
+    }
+  );
+});
+
 module.exports = router;
