@@ -55,7 +55,7 @@ const PdfViewer = () => {
           pdfFile: annotation.pdf_file, // 保证字段名一致
           pageNumber: annotation.page_number, // 保证字段名一致
           text: annotation.text,
-          userName: annotation.user_name,
+          userName: annotation.userName,
           createdAt: annotation.created_at,
         }));
         console.log("Fetched annotations:", fetchedAnnotations);
