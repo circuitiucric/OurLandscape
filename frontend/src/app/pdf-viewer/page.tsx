@@ -7,6 +7,10 @@ import { defaultLayoutPlugin } from "@react-pdf-viewer/default-layout";
 import "@react-pdf-viewer/default-layout/lib/styles/index.css";
 import { useSearchParams } from "next/navigation";
 import axios from "axios";
+import { toolbarPlugin } from "@react-pdf-viewer/toolbar";
+import { zoomPlugin } from "@react-pdf-viewer/zoom";
+import "@react-pdf-viewer/toolbar/lib/styles/index.css";
+import "@react-pdf-viewer/zoom/lib/styles/index.css";
 
 interface Annotation {
   id?: number;
@@ -25,7 +29,10 @@ const PdfViewer = () => {
 
   const [annotations, setAnnotations] = useState<Annotation[]>([]);
   const [currentPage, setCurrentPage] = useState<number>(1);
-  const annotationInputRef = useRef<HTMLInputElement | null>(null);
+  const annotationInputRef = useRef<HTMLTextAreaElement | null>(null);
+  const toolbarPluginInstance = toolbarPlugin();
+  const { Toolbar } = toolbarPluginInstance;
+  const zoomPluginInstance = zoomPlugin();
 
   // 修改批注获取逻辑，统一字段名
   useEffect(() => {
@@ -140,7 +147,7 @@ const PdfViewer = () => {
           .map((annotation) => (
             <div
               key={annotation.id}
-              style={{ backgroundColor: "yellow", marginBottom: "5px" }}
+              style={{ backgroundColor: "#d3d3d3", marginBottom: "5px" }} // 灰色背景
             >
               {annotation.text} - {annotation.userName}
             </div>
@@ -148,15 +155,32 @@ const PdfViewer = () => {
       </div>
       <form
         onSubmit={handleAnnotationSubmit}
-        style={{ position: "fixed", top: 10, right: 10 }}
+        style={{
+          position: "absolute", // 使用 absolute 定位
+          bottom: 10, // 固定在容器的底部
+          right: 10,
+          width: "280px", // 设置宽度为右侧列的宽度
+        }}
       >
-        <input
-          type="text"
+        <textarea
           ref={annotationInputRef}
           placeholder="Enter annotation text"
-          style={{ color: "black" }}
+          style={{
+            width: "100%", // 宽度占满容器
+            height: "60px", // 初始高度
+            color: "black",
+            resize: "none", // 禁止手动调整大小
+          }}
         />
-        <button type="submit">Add Annotation</button>
+        <button
+          type="submit"
+          style={{
+            width: "100%", // 按钮宽度与输入框一致
+            marginTop: "5px", // 与输入框保持一定距离
+          }}
+        >
+          Add Annotation
+        </button>
       </form>
     </div>
   );
