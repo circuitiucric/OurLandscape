@@ -1,6 +1,5 @@
-// src/app/pdf-viewer/page.tsx
 "use client";
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Worker, Viewer } from "@react-pdf-viewer/core";
 import "@react-pdf-viewer/core/lib/styles/index.css";
 import { defaultLayoutPlugin } from "@react-pdf-viewer/default-layout";
@@ -11,6 +10,8 @@ import { toolbarPlugin } from "@react-pdf-viewer/toolbar";
 import { zoomPlugin } from "@react-pdf-viewer/zoom";
 import "@react-pdf-viewer/toolbar/lib/styles/index.css";
 import "@react-pdf-viewer/zoom/lib/styles/index.css";
+
+import { parseHyperlinks } from "@/utils/hyperlinkParser";
 
 interface Annotation {
   id?: number;
@@ -23,113 +24,114 @@ interface Annotation {
 const PdfViewer = () => {
   const searchParams = useSearchParams();
   const file = searchParams?.get("file");
+  const page = parseInt(searchParams?.get("page") || "1", 10); // 获取页码参数，默认值为1
   const fileUrl = `http://localhost:3001/pdf/${file}`;
 
   const defaultLayoutPluginInstance = defaultLayoutPlugin();
-
   const [annotations, setAnnotations] = useState<Annotation[]>([]);
   const [currentPage, setCurrentPage] = useState<number>(1);
-  const annotationInputRef = useRef<HTMLTextAreaElement | null>(null);
+  const [isDocumentLoaded, setIsDocumentLoaded] = useState<boolean>(false); // 追踪文档加载状态
+
   const toolbarPluginInstance = toolbarPlugin();
   const { Toolbar } = toolbarPluginInstance;
   const zoomPluginInstance = zoomPlugin();
 
-  // 修改批注获取逻辑，统一字段名
+  // 添加处理文档点击的逻辑
   useEffect(() => {
-    console.log("Fetching PDF file from:", fileUrl);
+    const handleDocumentClick = (event: MouseEvent) => {
+      if (event.ctrlKey) {
+        const targetElement = event.target as HTMLElement;
+        if (targetElement && targetElement.innerText) {
+          const text = targetElement.innerText;
+          const linkData = parseHyperlinks(text);
+          if (linkData) {
+            const { fileName, pageNumber } = linkData;
+            const targetUrl = `http://localhost:3002/pdf-viewer?file=${fileName}&page=${pageNumber}`;
+            window.open(targetUrl, "_blank");
+          }
+        }
+      }
+    };
+    document.addEventListener("click", handleDocumentClick);
+    return () => {
+      document.removeEventListener("click", handleDocumentClick);
+    };
+  }, []);
+
+  // 在文档加载后跳转到指定页码
+  const handleDocumentLoad = () => {
+    setIsDocumentLoaded(true);
+    if (page) {
+      setCurrentPage(page); // 设置初始页面
+    }
+  };
+
+  // 获取批注和加载 PDF
+  useEffect(() => {
     fetch(fileUrl)
       .then((response) => {
         if (response.ok) {
           console.log("PDF file fetched successfully:", fileUrl);
         } else {
-          console.error(
-            "Failed to fetch PDF file:",
-            response.status,
-            response.statusText
-          );
+          console.error("Failed to fetch PDF file:", response.statusText);
         }
       })
-      .catch((error) => {
-        console.error("Error fetching PDF file:", error);
-      });
+      .catch((error) => console.error("Error fetching PDF file:", error));
 
-    // 获取批注
     axios
       .get(`http://localhost:3001/api/annotations?pdfFile=${file}`)
       .then((response) => {
         const fetchedAnnotations = response.data.map((annotation) => ({
           id: annotation.id,
-          pdfFile: annotation.pdf_file, // 保证字段名一致
-          pageNumber: annotation.page_number, // 保证字段名一致
+          pdfFile: annotation.pdf_file,
+          pageNumber: annotation.page_number,
           text: annotation.text,
           userName: annotation.userName,
           createdAt: annotation.created_at,
         }));
-        console.log("Fetched annotations:", fetchedAnnotations);
         setAnnotations(fetchedAnnotations);
       })
-      .catch((error) => {
-        console.error("Error fetching annotations:", error);
-      });
+      .catch((error) => console.error("Error fetching annotations:", error));
   }, [fileUrl]);
 
+  // 当文档加载完成并且存在 page 参数时，跳转到指定页码
+  useEffect(() => {
+    if (isDocumentLoaded && page) {
+      setCurrentPage(page); // 设置当前页面为指定页码
+    }
+  }, [isDocumentLoaded, page]);
+
+  // 提交批注
   const handleAnnotationSubmit = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-
     if (currentPage === null || !file) {
       return;
     }
 
-    const text = annotationInputRef.current?.value;
+    const text = (event.target as any).elements.textarea?.value;
     if (text) {
       const newAnnotation = { pdfFile: file, pageNumber: currentPage, text };
-
       axios
         .post("http://localhost:3001/api/annotations", newAnnotation, {
           headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
         })
         .then((response) => {
-          console.log("Added annotation:", response.data);
           setAnnotations([...annotations, response.data]);
-          if (annotationInputRef.current) {
-            annotationInputRef.current.value = "";
-          }
         })
-        .catch((error) => {
-          console.error("Error adding annotation:", error);
-        });
+        .catch((error) => console.error("Error adding annotation:", error));
     }
   };
 
-  const handleDocumentLoad = () => {
-    console.log("Document loaded");
-  };
-
-  const handlePageChange = (pageNumber: number) => {
-    setCurrentPage(pageNumber);
-    console.log("Current page:", pageNumber);
-  };
-
-  useEffect(() => {
-    console.log("Current page changed to:", currentPage);
-    console.log("Annotations before filtering:", annotations);
-    const pageAnnotations = annotations.filter(
-      (annotation) => annotation.pageNumber === currentPage
-    );
-    console.log("Annotations for current page:", pageAnnotations);
-  }, [currentPage, annotations]);
-
   return (
     <div style={{ display: "flex", height: "100vh" }}>
-      <Worker
-        workerUrl={`https://unpkg.com/pdfjs-dist@3.11.174/build/pdf.worker.min.js`}
-      >
+      <Worker workerUrl="https://unpkg.com/pdfjs-dist@3.11.174/build/pdf.worker.min.js">
         <div style={{ flex: 1 }}>
           <Viewer
             fileUrl={fileUrl}
-            plugins={[defaultLayoutPluginInstance]}
+            plugins={[defaultLayoutPluginInstance]} // 使用 defaultLayoutPluginInstance
             onDocumentLoad={handleDocumentLoad}
-            onPageChange={(e) => handlePageChange(e.currentPage + 1)}
+            onPageChange={(e) => setCurrentPage(e.currentPage + 1)} // 手动更新当前页码
+            initialPage={page - 1} // 设置初始页面为传入的页码
           />
         </div>
       </Worker>
@@ -146,8 +148,11 @@ const PdfViewer = () => {
           .filter((annotation) => annotation.pageNumber === currentPage)
           .map((annotation) => (
             <div
-              key={annotation.id}
-              style={{ backgroundColor: "#d3d3d3", marginBottom: "5px" }} // 灰色背景
+              key={
+                annotation.id ||
+                `annotation-${annotation.pageNumber}-${annotation.text}`
+              }
+              style={{ backgroundColor: "#d3d3d3", marginBottom: "5px" }}
             >
               {annotation.text} - {annotation.userName}
             </div>
@@ -155,30 +160,19 @@ const PdfViewer = () => {
       </div>
       <form
         onSubmit={handleAnnotationSubmit}
-        style={{
-          position: "absolute", // 使用 absolute 定位
-          bottom: 10, // 固定在容器的底部
-          right: 10,
-          width: "280px", // 设置宽度为右侧列的宽度
-        }}
+        style={{ position: "absolute", bottom: 10, right: 10, width: "280px" }}
       >
         <textarea
-          ref={annotationInputRef}
+          name="textarea"
           placeholder="Enter annotation text"
           style={{
-            width: "100%", // 宽度占满容器
-            height: "60px", // 初始高度
+            width: "100%",
+            height: "60px",
             color: "black",
-            resize: "none", // 禁止手动调整大小
+            resize: "none",
           }}
         />
-        <button
-          type="submit"
-          style={{
-            width: "100%", // 按钮宽度与输入框一致
-            marginTop: "5px", // 与输入框保持一定距离
-          }}
-        >
+        <button type="submit" style={{ width: "100%", marginTop: "5px" }}>
           Add Annotation
         </button>
       </form>
