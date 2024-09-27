@@ -24,19 +24,18 @@ interface Annotation {
 const PdfViewer = () => {
   const searchParams = useSearchParams();
   const file = searchParams?.get("file");
-  const page = parseInt(searchParams?.get("page") || "1", 10); // 获取页码参数，默认值为1
+  const page = parseInt(searchParams?.get("page") || "1", 10);
   const fileUrl = `http://localhost:3001/pdf/${file}`;
 
   const defaultLayoutPluginInstance = defaultLayoutPlugin();
   const [annotations, setAnnotations] = useState<Annotation[]>([]);
   const [currentPage, setCurrentPage] = useState<number>(1);
-  const [isDocumentLoaded, setIsDocumentLoaded] = useState<boolean>(false); // 追踪文档加载状态
+  const [isDocumentLoaded, setIsDocumentLoaded] = useState<boolean>(false);
 
   const toolbarPluginInstance = toolbarPlugin();
   const { Toolbar } = toolbarPluginInstance;
   const zoomPluginInstance = zoomPlugin();
 
-  // 添加处理文档点击的逻辑
   useEffect(() => {
     const handleDocumentClick = (event: MouseEvent) => {
       if (event.ctrlKey) {
@@ -58,15 +57,13 @@ const PdfViewer = () => {
     };
   }, []);
 
-  // 在文档加载后跳转到指定页码
   const handleDocumentLoad = () => {
     setIsDocumentLoaded(true);
     if (page) {
-      setCurrentPage(page); // 设置初始页面
+      setCurrentPage(page);
     }
   };
 
-  // 获取批注和加载 PDF
   useEffect(() => {
     fetch(fileUrl)
       .then((response) => {
@@ -94,14 +91,12 @@ const PdfViewer = () => {
       .catch((error) => console.error("Error fetching annotations:", error));
   }, [fileUrl]);
 
-  // 当文档加载完成并且存在 page 参数时，跳转到指定页码
   useEffect(() => {
     if (isDocumentLoaded && page) {
-      setCurrentPage(page); // 设置当前页面为指定页码
+      setCurrentPage(page);
     }
   }, [isDocumentLoaded, page]);
 
-  // 提交批注
   const handleAnnotationSubmit = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (currentPage === null || !file) {
@@ -128,10 +123,10 @@ const PdfViewer = () => {
         <div style={{ flex: 1 }}>
           <Viewer
             fileUrl={fileUrl}
-            plugins={[defaultLayoutPluginInstance]} // 使用 defaultLayoutPluginInstance
+            plugins={[defaultLayoutPluginInstance]}
             onDocumentLoad={handleDocumentLoad}
-            onPageChange={(e) => setCurrentPage(e.currentPage + 1)} // 手动更新当前页码
-            initialPage={page - 1} // 设置初始页面为传入的页码
+            onPageChange={(e) => setCurrentPage(e.currentPage + 1)}
+            initialPage={page - 1}
           />
         </div>
       </Worker>
@@ -145,7 +140,11 @@ const PdfViewer = () => {
       >
         <h3>Annotations for page {currentPage}</h3>
         {annotations
-          .filter((annotation) => annotation.pageNumber === currentPage)
+          .filter(
+            (annotation) =>
+              annotation.pageNumber === currentPage &&
+              annotation.pdfFile === file
+          )
           .map((annotation) => (
             <div
               key={
