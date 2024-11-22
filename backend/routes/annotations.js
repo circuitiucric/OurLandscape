@@ -25,6 +25,30 @@ router.get("/", (req, res) => {
   });
 });
 
+// 获取单个批注根据批注ID
+router.get("/:id", (req, res) => {
+  const { id } = req.params;
+  const numericId = parseInt(id, 10);
+  console.log("Received request for annotation ID:", id);
+
+  const query = "SELECT * FROM annotations WHERE annotation_id = ?";
+  console.log("Executing query:", query, "with id:", numericId);
+
+  db.query(query, [numericId])
+    .then((result) => {
+      if (result.length === 0) {
+        res.status(404).json({ error: "Annotation not found" });
+      } else {
+        console.log("Fetched annotation:", result[0]);
+        res.json(result[0]);
+      }
+    })
+    .catch((err) => {
+      console.error("Error executing query:", err);
+      res.status(500).json({ error: "Error executing query" });
+    });
+});
+
 // 添加批注
 router.post("/", (req, res) => {
   const { pdfFile, pageNumber, text } = req.body;

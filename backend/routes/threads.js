@@ -2,40 +2,70 @@ const express = require("express");
 const router = express.Router();
 const pool = require("../db"); // 假设你已经有一个用于数据库连接的文件
 
-// 创建一个新的帖子
+// 创建帖子（或获取现有帖子）
 router.post("/create", async (req, res) => {
   const { annotationId, userName } = req.body;
 
   try {
+    // 检查该批注是否已存在帖子
     const [existingThread] = await pool.query(
       "SELECT * FROM threads WHERE annotation_id = ?",
       [annotationId]
     );
 
+    let threadId;
     if (existingThread.length > 0) {
-      return res.status(200).json({ threadId: existingThread[0].id });
+      // 如果帖子已存在，直接返回现有的帖子 ID
+      threadId = existingThread[0].id;
+    } else {
+      // 如果没有帖子，创建新帖子
+      const [result] = await pool.query(
+        "INSERT INTO threads (annotation_id, created_by) VALUES (?, ?)",
+        [annotationId, userName]
+      );
+      threadId = result.insertId;
+
+      // 获取批注信息
+      const [annotation] = await pool.query(
+        "SELECT * FROM annotations WHERE annotation_id = ?",
+        [annotationId]
+      );
+
+      if (annotation.length === 0) {
+        return res.status(404).json({ error: "Annotation not found" });
+      }
+
+      // 生成跳转字符段
+      const jumpText = `#《${annotation[0].pdf_file}》 P${annotation[0].page_number}#`;
+      const linkText = `<a href="http://localhost:3002/pdf-viewer?file=${annotation[0].pdf_file}&page=${annotation[0].page_number}" target="_blank">${jumpText}</a>`;
+
+      // 只在帖子第一次创建时插入包含跳转链接的首个回复
+      await pool.query(
+        "INSERT INTO replies (thread_id, content, created_by) VALUES (?, ?, ?)",
+        [
+          threadId,
+          `${linkText} - ${annotation[0].text}`,
+          annotation[0].userName,
+        ]
+      );
     }
 
-    const [result] = await pool.query(
-      "INSERT INTO threads (annotation_id, created_by) VALUES (?, ?)",
-      [annotationId, userName]
-    );
-
-    res.status(201).json({ threadId: result.insertId });
+    // 返回帖子的 ID（无论是新创建的，还是已有的）
+    res.status(201).json({ threadId });
   } catch (error) {
     console.error("Error creating thread:", error);
     res.status(500).json({ error: "Failed to create thread" });
   }
 });
 
-// 获取特定批注的帖子
-router.get("/:annotationId", async (req, res) => {
-  const { annotationId } = req.params;
+/// 获取特定线程的帖子
+router.get("/:threadId", async (req, res) => {
+  const { threadId } = req.params;
 
   try {
     const [thread] = await pool.query(
-      "SELECT * FROM threads WHERE annotation_id = ?",
-      [annotationId]
+      "SELECT * FROM threads WHERE id = ?", // 根据 threadId 查找
+      [threadId]
     );
 
     if (thread.length === 0) {
