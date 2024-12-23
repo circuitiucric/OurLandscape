@@ -7,19 +7,24 @@ const jwtSecret = process.env.JWT_SECRET;
 // 获取所有批注
 router.get("/", (req, res) => {
   const { pdfFile } = req.query;
+  console.log("Received GET /api/annotations with query:", pdfFile);
+
   const query = pdfFile
     ? "SELECT * FROM annotations WHERE pdf_file = ?"
-    : "SELECT * FROM annotations";
+    : "SELECT * FROM annotations"; // 如果没有 pdfFile 参数，查询所有批注
   const params = pdfFile ? [pdfFile] : [];
 
-  console.log("Fetching annotations with query:", query, "and params:", params);
+  console.log("Executing query:", query, "with params:", params);
 
   db.query(query, params, (err, results) => {
     if (err) {
       console.error("Error fetching annotations:", err);
       res.status(500).json({ error: "Error fetching annotations" });
     } else {
-      console.log("Fetched annotations:", results);
+      console.log("Query results:", results); // 输出查询结果
+      if (results.length === 0) {
+        console.log("No annotations found");
+      }
       res.json(results);
     }
   });

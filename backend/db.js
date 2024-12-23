@@ -1,14 +1,17 @@
 const mysql = require("mysql2");
-
-// 创建数据库连接池
-const pool = mysql.createPool({
-  host: "localhost",
+const db = mysql.createConnection({
+  host: "127.0.0.1",
   user: "root",
   password: "xxhhqq007",
   database: "pdf_website",
-  waitForConnections: true,
-  connectionLimit: 10,
-  queueLimit: 0,
 });
 
-module.exports = pool.promise();
+db.connect((err) => {
+  if (err) {
+    console.error("Error connecting to the database:", err);
+  } else {
+    console.log("Connected to the database");
+  }
+});
+
+module.exports = db;

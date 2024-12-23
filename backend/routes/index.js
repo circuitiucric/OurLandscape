@@ -33,6 +33,7 @@ const conn = mysql.createConnection({
   multipleStatements: true,
 });
 
+// 用户注册
 app.post("/register", (req, res) => {
   var userName = req.body.userName;
   var passWord = req.body.passWord;
@@ -66,7 +67,7 @@ app.post("/register", (req, res) => {
   console.log("接收", req.body);
 });
 
-// 登录端口
+// 用户登录
 app.post("/login", (req, res) => {
   const { userName, passWord } = req.body;
   if (!userName || !passWord) {
@@ -93,6 +94,7 @@ app.post("/login", (req, res) => {
   });
 });
 
+// 获取 PDF 文件列表
 app.get("/pdfs", (req, res) => {
   const pdfDir = path.join(__dirname, "../public/pdf");
   fs.readdir(pdfDir, (err, files) => {
@@ -106,6 +108,7 @@ app.get("/pdfs", (req, res) => {
   });
 });
 
+// 获取单个 PDF 文件
 app.get("/pdf/:filename", (req, res) => {
   const pdfDir = path.join(__dirname, "../public/pdf");
   const filePath = path.join(pdfDir, req.params.filename);
@@ -119,44 +122,8 @@ app.get("/pdf/:filename", (req, res) => {
   });
 });
 
-app.get("/api/annotations", (req, res) => {
-  const sql = "SELECT * FROM annotations";
-  conn.query(sql, (err, results) => {
-    if (err) {
-      console.error(err);
-      res.status(500).json({ error: "Internal server error" });
-    } else {
-      res.json(results);
-    }
-  });
-});
-
-// 添加新的批注
-app.post("/api/annotations", (req, res) => {
-  const { pdfFile, pageNumber, text } = req.body;
-  const token = req.headers.authorization.split(" ")[1];
-
-  try {
-    const decoded = jwt.verify(token, jwtSecret, { algorithms: ["HS256"] }); // 使用环境变量中的密钥
-    console.log("Decoded token:", decoded); // 打印解码后的token信息
-    const userName = decoded.userName;
-
-    const sql =
-      "INSERT INTO annotations (pdf_file, page_number, text, userName) VALUES (?, ?, ?, ?)";
-    conn.query(sql, [pdfFile, pageNumber, text, userName], (err, result) => {
-      if (err) {
-        console.error(err);
-        res.status(500).json({ error: "Internal server error" });
-      } else {
-        res
-          .status(201)
-          .json({ id: result.insertId, pdfFile, pageNumber, text, userName });
-      }
-    });
-  } catch (err) {
-    console.error("Token verification failed:", err);
-    res.status(401).json({ error: "Unauthorized" });
-  }
-});
+// 挂载批注模块路由
+const annotationsRouter = require("./annotations");
+app.use("/api/annotations", annotationsRouter);
 
 module.exports = app;
