@@ -1,30 +1,43 @@
-// annotations.js
+//backend/routes/annotations.js
 const express = require("express");
 const router = express.Router();
 const db = require("../db"); // 已经是 mysql2/promise 创建的连接池
 const jwt = require("jsonwebtoken");
 const jwtSecret = process.env.JWT_SECRET;
 
-// 获取所有批注
+// 获取批注（支持根据 threadId 和 replyId 过滤）
 router.get("/", async (req, res) => {
-  const { pdfFile } = req.query;
-  console.log("Received GET /api/annotations with query:", pdfFile);
+  const { pdfFile, threadId, replyId } = req.query;
+  console.log("Received GET /api/annotations with query:", {
+    pdfFile,
+    threadId,
+    replyId,
+  });
 
-  const query = pdfFile
-    ? "SELECT * FROM annotations WHERE pdf_file = ?"
-    : "SELECT * FROM annotations"; // 如果没有 pdfFile 参数，查询所有批注
-  const params = pdfFile ? [pdfFile] : [];
+  let query = "SELECT * FROM annotations WHERE 1=1";
+  let params = [];
+
+  if (pdfFile) {
+    query += " AND pdf_file = ?";
+    params.push(pdfFile);
+  }
+
+  if (threadId) {
+    query += " AND thread_id = ?";
+    params.push(threadId);
+  }
+
+  if (replyId) {
+    query += " AND reply_id = ?";
+    params.push(replyId);
+  }
 
   console.log("Executing query:", query, "with params:", params);
 
   try {
-    // 使用 Promise 执行数据库查询
     const [results] = await db.query(query, params);
-    console.log("Query results:", results); // 输出查询结果
-    if (results.length === 0) {
-      console.log("No annotations found");
-    }
-    res.json(results); // 返回查询结果
+    console.log("Query results:", results);
+    res.json(results);
   } catch (err) {
     console.error("Error fetching annotations:", err);
     res.status(500).json({ error: "Error fetching annotations" });
@@ -41,7 +54,6 @@ router.get("/:id", async (req, res) => {
   console.log("Executing query:", query, "with id:", numericId);
 
   try {
-    // 使用 Promise 执行数据库查询
     const [result] = await db.query(query, [numericId]);
     if (result.length === 0) {
       res.status(404).json({ error: "Annotation not found" });
@@ -57,7 +69,8 @@ router.get("/:id", async (req, res) => {
 
 // 添加批注
 router.post("/", async (req, res) => {
-  const { pdfFile, pageNumber, text } = req.body;
+  console.log("Received POST request with body:", req.body);
+  const { pdfFile, pageNumber, text, threadId, replyId } = req.body;
   const token = req.headers.authorization.split(" ")[1];
   let userName;
 
@@ -65,29 +78,34 @@ router.post("/", async (req, res) => {
     // 解码JWT token，获取用户名
     const decoded = jwt.verify(token, jwtSecret);
     userName = decoded.userName;
+
+    console.log("Decoded userName:", userName); // 打印解码的用户名
   } catch (err) {
     console.error("Token verification failed:", err);
     return res.status(401).json({ error: "Unauthorized" });
   }
 
-  const query =
-    "INSERT INTO annotations (pdf_file, page_number, text, userName) VALUES (?, ?, ?, ?)";
+  // 如果是 PDF 批注，插入 pdf_file 和 page_number 字段
+  let query;
+  let values;
 
-  console.log("Inserting annotation with values:", [
-    pdfFile,
-    pageNumber,
-    text,
-    userName,
-  ]);
+  if (pdfFile) {
+    query =
+      "INSERT INTO annotations (pdf_file, page_number, text, userName) VALUES (?, ?, ?, ?)";
+    values = [pdfFile, pageNumber, text, userName];
+  }
+  // 如果是回帖批注，插入 thread_id 和 reply_id 字段
+  else if (threadId && replyId) {
+    query =
+      "INSERT INTO annotations (thread_id, reply_id, text, userName) VALUES (?, ?, ?, ?)";
+    values = [threadId, replyId, text, userName];
+  }
+
+  console.log("Inserting annotation with values:", values);
 
   try {
-    // 使用Promise方式执行数据库查询
-    const [result] = await db.query(query, [
-      pdfFile,
-      pageNumber,
-      text,
-      userName,
-    ]);
+    // 使用 Promise 执行数据库查询
+    const [result] = await db.query(query, values);
 
     // 构造新批注对象并返回给客户端
     const newAnnotation = {
@@ -97,6 +115,8 @@ router.post("/", async (req, res) => {
       text,
       userName,
       created_at: new Date(),
+      threadId,
+      replyId,
     };
     console.log("Added annotation:", newAnnotation);
     res.json(newAnnotation);

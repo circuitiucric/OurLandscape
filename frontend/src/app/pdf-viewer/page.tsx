@@ -31,10 +31,6 @@ const PdfViewer = () => {
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [isDocumentLoaded, setIsDocumentLoaded] = useState<boolean>(false);
 
-  const toolbarPluginInstance = toolbarPlugin();
-  const { Toolbar } = toolbarPluginInstance;
-  const zoomPluginInstance = zoomPlugin();
-
   useEffect(() => {
     const handleDocumentClick = (event: MouseEvent) => {
       if (event.ctrlKey) {
