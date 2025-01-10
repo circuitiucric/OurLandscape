@@ -6,11 +6,8 @@ import { defaultLayoutPlugin } from "@react-pdf-viewer/default-layout";
 import "@react-pdf-viewer/default-layout/lib/styles/index.css";
 import { useSearchParams } from "next/navigation";
 import axios from "axios";
-import { toolbarPlugin } from "@react-pdf-viewer/toolbar";
-import { zoomPlugin } from "@react-pdf-viewer/zoom";
-import "@react-pdf-viewer/toolbar/lib/styles/index.css";
-import "@react-pdf-viewer/zoom/lib/styles/index.css";
 import { parseHyperlinks } from "@/utils/hyperlinkParser";
+import AnnotationViewer from "../components/AnnotationViewer"; // 引入 AnnotationViewer 组件
 
 interface Annotation {
   id?: number;
@@ -92,7 +89,6 @@ const PdfViewer = () => {
     }
   }, [isDocumentLoaded, page]);
 
-  // 在提交批注的地方插入日志
   const handleAnnotationSubmit = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (currentPage === null || !file) {
@@ -105,7 +101,7 @@ const PdfViewer = () => {
         pdfFile: file,
         pageNumber: currentPage,
         text,
-      }); // 插入日志
+      });
       const newAnnotation = { pdfFile: file, pageNumber: currentPage, text };
       axios
         .post("http://localhost:3001/api/annotations", newAnnotation, {
@@ -119,7 +115,7 @@ const PdfViewer = () => {
   };
 
   const handleAnnotationDoubleClick = async (annotationId: number) => {
-    console.log("Double clicked annotation ID:", annotationId); // 插入日志
+    console.log("Double clicked annotation ID:", annotationId);
     try {
       // 查询现有帖子
       const existingResponse = await axios.get(
@@ -130,14 +126,13 @@ const PdfViewer = () => {
         const threadId = existingResponse.data.id;
         const targetUrl = `http://localhost:3002/threads/${threadId}`;
         window.open(targetUrl, "_blank");
-        return; // 退出，不再创建新帖子
+        return;
       }
     } catch (error) {
       // 如果找不到现有帖子，则继续创建新帖子
       console.log("No existing thread found, creating a new one...");
     }
 
-    // 创建新帖子
     try {
       console.log(
         "Preparing to create thread with annotation ID:",
@@ -150,14 +145,13 @@ const PdfViewer = () => {
           userName: "Current User", // TODO: 使用真实用户信息
         }
       );
-      console.log("Thread created successfully:", response.data); // 插入日志
       const threadId = response.data.threadId;
 
       // 跳转到新页面并传递 threadId
       const targetUrl = `http://localhost:3002/threads/${threadId}`;
       window.open(targetUrl, "_blank");
     } catch (error) {
-      console.error("Error creating thread:", error); // 插入日志
+      console.error("Error creating thread:", error);
     }
   };
 
@@ -175,6 +169,8 @@ const PdfViewer = () => {
             />
           </div>
         </Worker>
+
+        {/* 批注展示区域 */}
         <div
           style={{
             width: "300px",
@@ -184,27 +180,15 @@ const PdfViewer = () => {
           }}
         >
           <h3>Annotations for page {currentPage}</h3>
-          {annotations
-            .filter(
-              (annotation) =>
-                annotation.pageNumber === currentPage &&
-                annotation.pdfFile === file
-            )
-            .map((annotation) => (
-              <div
-                key={
-                  annotation.id ||
-                  `annotation-${annotation.pageNumber}-${annotation.text}`
-                }
-                style={{ backgroundColor: "#d3d3d3", marginBottom: "5px" }}
-                onDoubleClick={() =>
-                  handleAnnotationDoubleClick(annotation.id!)
-                } // 双击事件
-              >
-                {annotation.text} - {annotation.userName}
-              </div>
-            ))}
+          <AnnotationViewer
+            annotations={annotations}
+            currentPage={currentPage}
+            file={file ?? ""} // 确保传递给AnnotationViewer的是有效的string
+            onAnnotationDoubleClick={handleAnnotationDoubleClick} // 传递双击事件处理函数
+          />
         </div>
+
+        {/* 提交批注 */}
         <form
           onSubmit={handleAnnotationSubmit}
           style={{
