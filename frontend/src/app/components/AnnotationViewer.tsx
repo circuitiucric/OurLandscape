@@ -6,14 +6,12 @@ interface Annotation {
   pageNumber: number;
   text: string;
   userName: string;
-  threadId?: number; // 可能在发帖页面会用到
-  replyId?: number; // 可能在发帖页面会用到
 }
 
 interface AnnotationViewerProps {
   annotations: Annotation[];
   currentPage: number;
-  file: string | null;
+  file: string;
   onAnnotationDoubleClick: (annotationId: number) => void;
 }
 
@@ -47,6 +45,7 @@ const AnnotationViewer: React.FC<AnnotationViewerProps> = ({
               marginBottom: "5px",
               padding: "5px",
               borderRadius: "3px",
+              cursor: "pointer",
             }}
             onDoubleClick={() => onAnnotationDoubleClick(annotation.id!)} // 双击事件
           >
