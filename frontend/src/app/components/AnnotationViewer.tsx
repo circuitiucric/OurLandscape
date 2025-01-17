@@ -7,27 +7,38 @@ interface Annotation {
   pageNumber: number;
   text: string;
   userName: string;
+  replyId?: number; // 只关注 replyId
 }
 
 interface AnnotationViewerProps {
   annotations: Annotation[];
   currentPage: number;
-  file: string;
+  file?: string;
+  replyId?: string; // 只需要 replyId 来过滤批注
 }
 
 const AnnotationViewer: React.FC<AnnotationViewerProps> = ({
   annotations,
   currentPage,
   file,
+  replyId,
 }) => {
-  // 过滤出当前页面和当前PDF文件的批注
-  const filteredAnnotations = annotations.filter(
-    (annotation) =>
-      annotation.pageNumber === currentPage && annotation.pdfFile === file
-  );
+  // 过滤出当前页和相关批注
+  const filteredAnnotations = annotations.filter((annotation) => {
+    if (file) {
+      return (
+        annotation.pdfFile === file && annotation.pageNumber === currentPage
+      );
+    }
+    if (replyId) {
+      return annotation.replyId === parseInt(replyId, 10); // 只根据 replyId 来过滤
+    }
+    return false;
+  });
 
   const handleAnnotationDoubleClick = async (annotationId: number) => {
     console.log("Double clicked annotation ID:", annotationId);
+
     try {
       // 查询现有帖子
       const existingResponse = await axios.get(
@@ -69,17 +80,14 @@ const AnnotationViewer: React.FC<AnnotationViewerProps> = ({
 
   return (
     <div>
-      <h3>Annotations for page {currentPage}</h3>
+      <h3>Annotations</h3>
       {/* 如果没有批注显示提示 */}
       {filteredAnnotations.length === 0 ? (
         <p>No annotations for this page.</p>
       ) : (
         filteredAnnotations.map((annotation) => (
           <div
-            key={
-              annotation.id ||
-              `annotation-${annotation.pageNumber}-${annotation.text}`
-            }
+            key={annotation.id || `annotation-${annotation.text}`}
             style={{
               backgroundColor: "#d3d3d3",
               marginBottom: "5px",

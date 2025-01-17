@@ -1,16 +1,14 @@
-//backend/routes/annotations.js
 const express = require("express");
 const router = express.Router();
 const db = require("../db"); // 已经是 mysql2/promise 创建的连接池
 const jwt = require("jsonwebtoken");
 const jwtSecret = process.env.JWT_SECRET;
 
-// 获取批注（支持根据 threadId 和 replyId 过滤）
+// 获取批注（支持根据 replyId 过滤）
 router.get("/", async (req, res) => {
-  const { pdfFile, threadId, replyId } = req.query;
+  const { pdfFile, replyId } = req.query;
   console.log("Received GET /api/annotations with query:", {
     pdfFile,
-    threadId,
     replyId,
   });
 
@@ -20,11 +18,6 @@ router.get("/", async (req, res) => {
   if (pdfFile) {
     query += " AND pdf_file = ?";
     params.push(pdfFile);
-  }
-
-  if (threadId) {
-    query += " AND thread_id = ?";
-    params.push(threadId);
   }
 
   if (replyId) {
@@ -70,7 +63,7 @@ router.get("/:id", async (req, res) => {
 // 添加批注
 router.post("/", async (req, res) => {
   console.log("Received POST request with body:", req.body);
-  const { pdfFile, pageNumber, text, threadId, replyId } = req.body;
+  const { pdfFile, pageNumber, text, replyId } = req.body;
   const token = req.headers.authorization.split(" ")[1];
   let userName;
 
@@ -94,11 +87,11 @@ router.post("/", async (req, res) => {
       "INSERT INTO annotations (pdf_file, page_number, text, userName) VALUES (?, ?, ?, ?)";
     values = [pdfFile, pageNumber, text, userName];
   }
-  // 如果是回帖批注，插入 thread_id 和 reply_id 字段
-  else if (threadId && replyId) {
+  // 如果是回帖批注，插入 reply_id 字段
+  else if (replyId) {
     query =
-      "INSERT INTO annotations (thread_id, reply_id, text, userName) VALUES (?, ?, ?, ?)";
-    values = [threadId, replyId, text, userName];
+      "INSERT INTO annotations (reply_id, text, userName) VALUES (?, ?, ?)";
+    values = [replyId, text, userName];
   }
 
   console.log("Inserting annotation with values:", values);
@@ -115,7 +108,6 @@ router.post("/", async (req, res) => {
       text,
       userName,
       created_at: new Date(),
-      threadId,
       replyId,
     };
     console.log("Added annotation:", newAnnotation);
