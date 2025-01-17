@@ -114,47 +114,6 @@ const PdfViewer = () => {
     }
   };
 
-  const handleAnnotationDoubleClick = async (annotationId: number) => {
-    console.log("Double clicked annotation ID:", annotationId);
-    try {
-      // 查询现有帖子
-      const existingResponse = await axios.get(
-        `http://localhost:3001/api/threads/${annotationId}`
-      );
-      if (existingResponse.status === 200) {
-        // 如果已有帖子，跳转到该帖子页面
-        const threadId = existingResponse.data.id;
-        const targetUrl = `http://localhost:3002/threads/${threadId}`;
-        window.open(targetUrl, "_blank");
-        return;
-      }
-    } catch (error) {
-      // 如果找不到现有帖子，则继续创建新帖子
-      console.log("No existing thread found, creating a new one...");
-    }
-
-    try {
-      console.log(
-        "Preparing to create thread with annotation ID:",
-        annotationId
-      );
-      const response = await axios.post(
-        "http://localhost:3001/api/threads/create",
-        {
-          annotationId: annotationId, // 确保键名与后端一致
-          userName: "Current User", // TODO: 使用真实用户信息
-        }
-      );
-      const threadId = response.data.threadId;
-
-      // 跳转到新页面并传递 threadId
-      const targetUrl = `http://localhost:3002/threads/${threadId}`;
-      window.open(targetUrl, "_blank");
-    } catch (error) {
-      console.error("Error creating thread:", error);
-    }
-  };
-
   return (
     <Suspense fallback={<div>Loading...</div>}>
       <div style={{ display: "flex", height: "100vh" }}>
@@ -184,7 +143,6 @@ const PdfViewer = () => {
             annotations={annotations}
             currentPage={currentPage}
             file={file ?? ""} // 确保传递给AnnotationViewer的是有效的string
-            onAnnotationDoubleClick={handleAnnotationDoubleClick} // 传递双击事件处理函数
           />
         </div>
 
