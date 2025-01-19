@@ -3,8 +3,8 @@ import axios from "axios";
 
 interface Annotation {
   id?: number;
-  pdfFile: string;
-  pageNumber: number;
+  pdfFile?: string;
+  pageNumber?: number;
   text: string;
   userName: string;
   replyId?: number; // 只关注 replyId
@@ -12,9 +12,9 @@ interface Annotation {
 
 interface AnnotationViewerProps {
   annotations: Annotation[];
-  currentPage: number;
+  currentPage?: number;
   file?: string;
-  replyId?: string; // 只需要 replyId 来过滤批注
+  replyId?: number | null; // 修改为 number | null
 }
 
 const AnnotationViewer: React.FC<AnnotationViewerProps> = ({
@@ -23,18 +23,37 @@ const AnnotationViewer: React.FC<AnnotationViewerProps> = ({
   file,
   replyId,
 }) => {
+  // 打印传递给 AnnotationViewer 的 replyId 和 annotations
+  console.log("Current replyId passed to AnnotationViewer:", replyId);
+  console.log("Annotations received by AnnotationViewer:", annotations);
+
   // 过滤出当前页和相关批注
   const filteredAnnotations = annotations.filter((annotation) => {
+    console.log(
+      "Comparing annotation.replyId:",
+      annotation.replyId,
+      "with replyId:",
+      replyId
+    );
+
     if (file) {
       return (
         annotation.pdfFile === file && annotation.pageNumber === currentPage
       );
     }
-    if (replyId) {
-      return annotation.replyId === parseInt(replyId, 10); // 只根据 replyId 来过滤
+
+    if (replyId !== null && replyId !== undefined) {
+      // 直接比较 replyId 和 annotation.replyId
+      console.log(`Checking if ${annotation.replyId} === ${replyId}`); // 增加调试信息
+      return annotation.replyId === replyId;
     }
+
     return false;
   });
+
+  // 打印过滤后的批注数据
+  console.log("Filtered annotations:", filteredAnnotations);
+  console.log("replyId type:", typeof replyId); // 查看传递的 replyId 的类型
 
   const handleAnnotationDoubleClick = async (annotationId: number) => {
     console.log("Double clicked annotation ID:", annotationId);
@@ -83,7 +102,7 @@ const AnnotationViewer: React.FC<AnnotationViewerProps> = ({
       <h3>Annotations</h3>
       {/* 如果没有批注显示提示 */}
       {filteredAnnotations.length === 0 ? (
-        <p>No annotations for this page.</p>
+        <p>No annotations for this reply.</p>
       ) : (
         filteredAnnotations.map((annotation) => (
           <div

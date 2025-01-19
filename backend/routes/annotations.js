@@ -9,7 +9,7 @@ router.get("/", async (req, res) => {
   const { pdfFile, replyId } = req.query;
   console.log("Received GET /api/annotations with query:", {
     pdfFile,
-    replyId,
+    replyId, //这里的类型是字符形式，可能是这里导致批注区无法正常显示？
   });
 
   let query = "SELECT * FROM annotations WHERE 1=1";
@@ -21,8 +21,10 @@ router.get("/", async (req, res) => {
   }
 
   if (replyId) {
+    // 确保 replyId 是数字类型
+    const numericReplyId = parseInt(replyId, 10);
     query += " AND reply_id = ?";
-    params.push(replyId);
+    params.push(numericReplyId);
   }
 
   console.log("Executing query:", query, "with params:", params);
@@ -63,7 +65,7 @@ router.get("/:id", async (req, res) => {
 // 添加批注
 router.post("/", async (req, res) => {
   console.log("Received POST request with body:", req.body);
-  const { pdfFile, pageNumber, text, replyId } = req.body;
+  const { pdfFile, pageNumber, text, replyId } = req.body; //这里的replyId形式是任意，这是否可以解释批注输入框能正常工作而批注显示区却不行？
   const token = req.headers.authorization.split(" ")[1];
   let userName;
 

@@ -1,11 +1,11 @@
 import React, { useEffect, useState } from "react";
 import { useRouter } from "next/router";
 import axios from "axios";
+import AnnotationViewer from "src/app/components/AnnotationViewer"; // 引入批注展示组件
 
 interface Annotation {
-  id: number;
-  pdfFile: string;
-  pageNumber: number;
+  id?: number;
+  replyId: number;
   text: string;
   userName: string;
 }
@@ -23,6 +23,8 @@ const ThreadPage = () => {
   const [annotation, setAnnotation] = useState<Annotation | null>(null);
   const [replies, setReplies] = useState<Reply[]>([]);
   const [newReply, setNewReply] = useState("");
+  const [selectedReplyId, setSelectedReplyId] = useState<number | null>(null); // 当前选中的回复
+  const [annotations, setAnnotations] = useState<Annotation[]>([]); // 存储批注
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -59,6 +61,19 @@ const ThreadPage = () => {
     }
   }, [id]);
 
+  useEffect(() => {
+    if (selectedReplyId !== null) {
+      axios
+        .get(`http://localhost:3001/api/annotations?replyId=${selectedReplyId}`)
+        .then((response) => {
+          setAnnotations(response.data);
+        })
+        .catch((error) => {
+          console.error("Error fetching annotations:", error);
+        });
+    }
+  }, [selectedReplyId]);
+
   const handleReplySubmit = async () => {
     if (!newReply) return;
 
@@ -86,6 +101,39 @@ const ThreadPage = () => {
     }
   };
 
+  const handleAnnotationSubmit = async (
+    event: React.FormEvent<HTMLFormElement>
+  ) => {
+    event.preventDefault();
+    if (selectedReplyId === null) return;
+
+    const text = (event.target as any).elements.textarea?.value;
+    if (text) {
+      const newAnnotation = { replyId: selectedReplyId, text };
+      try {
+        const response = await axios.post(
+          "http://localhost:3001/api/annotations",
+          newAnnotation,
+          {
+            headers: {
+              Authorization: `Bearer ${localStorage.getItem("token")}`,
+            },
+          }
+        );
+        setAnnotations((prevAnnotations) => [
+          ...prevAnnotations,
+          response.data,
+        ]);
+      } catch (error) {
+        console.error("Error adding annotation:", error);
+      }
+    }
+  };
+
+  const handleReplyClick = (replyId: number) => {
+    setSelectedReplyId(replyId);
+  };
+
   if (loading) {
     return <div>Loading...</div>;
   }
@@ -99,53 +147,93 @@ const ThreadPage = () => {
   }
 
   return (
-    <div style={{ padding: "20px" }}>
-      <h1>Annotation Details</h1>
-      <div>
-        <strong>PDF File:</strong> {annotation.pdfFile}
-      </div>
-      <div>
-        <strong>Page Number:</strong> {annotation.pageNumber}
-      </div>
-      <div>
-        <strong>Text:</strong>{" "}
-        <div
-          dangerouslySetInnerHTML={{
-            __html: annotation.text, // 直接渲染批注文本
-          }}
-        />
-      </div>
-      <div>
-        <strong>Created By:</strong> {annotation.userName}
-      </div>
+    <div style={{ display: "flex", height: "100vh" }}>
+      <div style={{ flex: 1, padding: "20px" }}>
+        <h1>Annotation Details</h1>
 
-      <h2>Replies</h2>
-      <div>
-        {replies.map((reply) => (
-          <div key={reply.id} style={{ marginBottom: "20px" }}>
-            <div>
-              <strong>{reply.created_by}</strong>
-            </div>
+        <div>
+          <strong>Text:</strong>{" "}
+          <div
+            dangerouslySetInnerHTML={{
+              __html: annotation.text, // 直接渲染批注文本
+            }}
+          />
+        </div>
+        <div>
+          <strong>Created By:</strong> {annotation.userName}
+        </div>
+
+        <h2>Replies</h2>
+        <div>
+          {replies.map((reply) => (
             <div
-              dangerouslySetInnerHTML={{
-                __html: reply.content, // 渲染从数据库获取的回复
-              }}
-            />
-            <div>{new Date(reply.created_at).toLocaleString()}</div>
-          </div>
-        ))}
+              key={reply.id}
+              style={{ marginBottom: "20px", cursor: "pointer" }}
+              onClick={() => handleReplyClick(reply.id)}
+            >
+              <div>
+                <strong>{reply.created_by}</strong>
+              </div>
+              <div
+                dangerouslySetInnerHTML={{
+                  __html: reply.content, // 渲染从数据库获取的回复
+                }}
+              />
+              <div>{new Date(reply.created_at).toLocaleString()}</div>
+            </div>
+          ))}
+        </div>
+
+        <h3>Post a Reply</h3>
+        <textarea
+          value={newReply}
+          onChange={(e) => setNewReply(e.target.value)}
+          rows={4}
+          style={{ width: "100%" }}
+        />
+        <button onClick={handleReplySubmit} style={{ marginTop: "10px" }}>
+          Submit Reply
+        </button>
       </div>
 
-      <h3>Post a Reply</h3>
-      <textarea
-        value={newReply}
-        onChange={(e) => setNewReply(e.target.value)}
-        rows={4}
-        style={{ width: "100%" }}
-      />
-      <button onClick={handleReplySubmit} style={{ marginTop: "10px" }}>
-        Submit Reply
-      </button>
+      {/* 批注展示区域 */}
+      <div
+        style={{
+          width: "300px",
+          height: "100vh",
+          overflowY: "auto",
+          backgroundColor: "#f0f0f0",
+          padding: "10px",
+        }}
+      >
+        <h3>Annotations for reply {selectedReplyId}</h3>
+        <AnnotationViewer annotations={annotations} replyId={selectedReplyId} />
+
+        {/* 批注输入框 */}
+        <form
+          onSubmit={handleAnnotationSubmit}
+          style={{
+            position: "absolute",
+            bottom: 10,
+            right: 10,
+            width: "280px",
+          }}
+        >
+          <textarea
+            name="textarea"
+            placeholder="Enter annotation text"
+            style={{
+              width: "100%",
+              height: "60px",
+              color: "black",
+              resize: "none",
+            }}
+          />
+          <button type="submit" style={{ width: "100%", marginTop: "5px" }}>
+            Add Annotation
+          </button>
+        </form>
+      </div>
     </div>
   );
 };
