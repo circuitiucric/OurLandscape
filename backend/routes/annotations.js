@@ -4,12 +4,11 @@ const db = require("../db"); // 已经是 mysql2/promise 创建的连接池
 const jwt = require("jsonwebtoken");
 const jwtSecret = process.env.JWT_SECRET;
 
-// 获取批注（支持根据 replyId 过滤）
 router.get("/", async (req, res) => {
   const { pdfFile, replyId } = req.query;
   console.log("Received GET /api/annotations with query:", {
     pdfFile,
-    replyId, //这里的类型是字符形式，可能是这里导致批注区无法正常显示？
+    replyId,
   });
 
   let query = "SELECT * FROM annotations WHERE 1=1";
@@ -21,7 +20,6 @@ router.get("/", async (req, res) => {
   }
 
   if (replyId) {
-    // 确保 replyId 是数字类型
     const numericReplyId = parseInt(replyId, 10);
     query += " AND reply_id = ?";
     params.push(numericReplyId);
@@ -31,8 +29,16 @@ router.get("/", async (req, res) => {
 
   try {
     const [results] = await db.query(query, params);
-    console.log("Query results:", results);
-    res.json(results);
+
+    // 映射字段名，将 `reply_id` 改为 `replyId`
+    const mappedResults = results.map((item) => ({
+      ...item,
+      replyId: item.reply_id, // 映射字段
+      // 如果你还需要其他字段映射，可以在这里继续添加
+    }));
+
+    console.log("Query results:", mappedResults);
+    res.json(mappedResults);
   } catch (err) {
     console.error("Error fetching annotations:", err);
     res.status(500).json({ error: "Error fetching annotations" });

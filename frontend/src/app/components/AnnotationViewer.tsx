@@ -37,6 +37,10 @@ const AnnotationViewer: React.FC<AnnotationViewerProps> = ({
     );
 
     if (file) {
+      console.log("Filtering based on file and pageNumber...");
+      console.log(
+        `Checking if annotation.pdfFile === ${file} and annotation.pageNumber === ${currentPage}`
+      );
       return (
         annotation.pdfFile === file && annotation.pageNumber === currentPage
       );
@@ -54,6 +58,11 @@ const AnnotationViewer: React.FC<AnnotationViewerProps> = ({
   // 打印过滤后的批注数据
   console.log("Filtered annotations:", filteredAnnotations);
   console.log("replyId type:", typeof replyId); // 查看传递的 replyId 的类型
+
+  // 如果过滤后没有找到批注，打印相关信息
+  if (filteredAnnotations.length === 0) {
+    console.log("No annotations found for this replyId:", replyId);
+  }
 
   const handleAnnotationDoubleClick = async (annotationId: number) => {
     console.log("Double clicked annotation ID:", annotationId);
