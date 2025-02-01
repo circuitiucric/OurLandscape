@@ -23,17 +23,11 @@ const AnnotationViewer: React.FC<AnnotationViewerProps> = ({
   file,
   replyId,
 }) => {
-  // 打印传递给 AnnotationViewer 的 replyId 和 annotations
-  console.log("Current replyId passed to AnnotationViewer:", replyId);
-  console.log("Annotations received by AnnotationViewer:", annotations);
-
   // 过滤出当前页和相关批注
   const filteredAnnotations = annotations.filter((annotation) => {
+    // 打印每个批注的 replyId 和当前传递的 replyId
     console.log(
-      "Comparing annotation.replyId:",
-      annotation.replyId,
-      "with replyId:",
-      replyId
+      `Checking annotation.replyId: ${annotation.replyId} against replyId: ${replyId}`
     );
 
     if (file) {
@@ -47,8 +41,8 @@ const AnnotationViewer: React.FC<AnnotationViewerProps> = ({
     }
 
     if (replyId !== null && replyId !== undefined) {
-      // 直接比较 replyId 和 annotation.replyId
-      console.log(`Checking if ${annotation.replyId} === ${replyId}`); // 增加调试信息
+      // 检查 replyId 是否匹配
+      console.log(`Checking if ${annotation.replyId} === ${replyId}`);
       return annotation.replyId === replyId;
     }
 
@@ -57,9 +51,6 @@ const AnnotationViewer: React.FC<AnnotationViewerProps> = ({
 
   // 打印过滤后的批注数据
   console.log("Filtered annotations:", filteredAnnotations);
-  console.log("replyId type:", typeof replyId); // 查看传递的 replyId 的类型
-
-  // 如果过滤后没有找到批注，打印相关信息
   if (filteredAnnotations.length === 0) {
     console.log("No annotations found for this replyId:", replyId);
   }
@@ -123,7 +114,11 @@ const AnnotationViewer: React.FC<AnnotationViewerProps> = ({
               borderRadius: "3px",
               cursor: "pointer",
             }}
-            onDoubleClick={() => handleAnnotationDoubleClick(annotation.id!)} // 双击事件
+            onDoubleClick={() => {
+              // 打印双击时的批注 ID 和相关信息
+              console.log("Double clicked annotation:", annotation);
+              handleAnnotationDoubleClick(annotation.id!); // 双击事件
+            }}
           >
             <p style={{ margin: 0 }}>
               <strong>{annotation.userName}</strong>: {annotation.text}
