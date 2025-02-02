@@ -147,7 +147,14 @@ const ThreadPage = () => {
   }
 
   return (
-    <div style={{ display: "flex", height: "100vh" }}>
+    <div
+      style={{
+        display: "flex",
+        height: "100vh",
+        backgroundColor: "#fff",
+        color: "#000",
+      }}
+    >
       <div style={{ flex: 1, padding: "20px" }}>
         <h1>Annotation Details</h1>
 

@@ -30,13 +30,12 @@ router.get("/", async (req, res) => {
   try {
     const [results] = await db.query(query, params);
 
-    // 映射字段名，将 `reply_id` 改为 `replyId`
+    // 映射字段名，将 reply_id 改为 replyId
     const mappedResults = results.map((item) => ({
       ...item,
-      id: item.annotation_id, // 将 annotation_id 映射为 id
-      replyId: item.reply_id, // 将 reply_id 映射为 replyId
-      annotation_id: undefined, // 清理旧字段名
-      reply_id: undefined, // 清理旧字段名
+      id: item.annotation_id, // 映射 annotation_id 为 id
+      replyId: item.reply_id, // 映射字段
+      // 如果你还需要其他字段映射，可以在这里继续添加
     }));
 
     console.log("Query results:", mappedResults);
