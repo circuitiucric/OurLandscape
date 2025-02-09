@@ -8,6 +8,8 @@ interface Annotation {
   replyId: number;
   text: string;
   userName: string;
+  pdfFile?: string;
+  pageNumber?: number;
 }
 
 interface Reply {
@@ -77,7 +79,7 @@ const ThreadPage = () => {
   const handleReplySubmit = async () => {
     if (!newReply) return;
 
-    const userName = "Current User"; // 使用实际用户信息
+    const userName = "c"; // 使用实际用户信息
     try {
       const response = await axios.post("http://localhost:3001/api/replies", {
         thread_id: id,
@@ -151,24 +153,39 @@ const ThreadPage = () => {
       style={{
         display: "flex",
         height: "100vh",
-        backgroundColor: "#fff",
+        backgroundColor: "#f5f5dc",
         color: "#000",
+        overflowY: "auto", // 确保整个页面可以滑动
       }}
     >
       <div style={{ flex: 1, padding: "20px" }}>
         <h1>Annotation Details</h1>
 
+        {/* 显示批注信息 */}
         <div>
           <strong>Text:</strong>{" "}
           <div
             dangerouslySetInnerHTML={{
-              __html: annotation.text, // 直接渲染批注文本
+              __html: annotation.text, // 渲染批注文本
             }}
           />
         </div>
         <div>
           <strong>Created By:</strong> {annotation.userName}
         </div>
+
+        {/* 如果存在PDF文件和页码，显示跳转链接 */}
+        {annotation.pdfFile && annotation.pageNumber && (
+          <div>
+            <strong>Jump to PDF:</strong>{" "}
+            <a
+              href={`http://localhost:3002/pdf-viewer?file=${annotation.pdfFile}&page=${annotation.pageNumber}`}
+              target="_blank"
+            >
+              Click to view the annotation in the PDF
+            </a>
+          </div>
+        )}
 
         <h2>Replies</h2>
         <div>
@@ -208,7 +225,7 @@ const ThreadPage = () => {
         style={{
           width: "300px",
           height: "100vh",
-          overflowY: "auto",
+          overflowY: "auto", // 让批注区域可滚动
           backgroundColor: "#f0f0f0",
           padding: "10px",
         }}

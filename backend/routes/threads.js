@@ -35,9 +35,15 @@ router.post("/create", async (req, res) => {
         return res.status(404).json({ error: "Annotation not found" });
       }
 
-      // 生成跳转字符段
-      const jumpText = `#《${annotation[0].pdf_file}》 P${annotation[0].page_number}#`;
-      const linkText = `<a href="http://localhost:3002/pdf-viewer?file=${annotation[0].pdf_file}&page=${annotation[0].page_number}" target="_blank">${jumpText}</a>`;
+      let linkText;
+      if (annotation[0].pdf_file && annotation[0].page_number) {
+        // 如果批注是来自 PDF 页面
+        const jumpText = `#《${annotation[0].pdf_file}》 P${annotation[0].page_number}#`;
+        linkText = `<a href="http://localhost:3002/pdf-viewer?file=${annotation[0].pdf_file}&page=${annotation[0].page_number}" target="_blank">${jumpText}</a>`;
+      } else if (annotation[0].replyId) {
+        // 如果批注是来自帖子区
+        linkText = `<a href="http://localhost:3002/threads/${annotation[0].replyId}" target="_blank">帖子区批注</a>`;
+      }
 
       // 只在帖子第一次创建时插入包含跳转链接的首个回复
       await pool.query(
