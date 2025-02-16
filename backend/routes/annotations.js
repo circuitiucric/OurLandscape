@@ -9,7 +9,7 @@ router.get("/", async (req, res) => {
   console.log("Received GET /api/annotations with query:", {
     pdfFile,
     replyId,
-  });
+  }); //这里应该是个筛选逻辑，根据不同情况筛选不同的annotations
 
   let query = "SELECT * FROM annotations WHERE 1=1";
   let params = [];
@@ -72,7 +72,7 @@ router.get("/:id", async (req, res) => {
 // 添加批注
 router.post("/", async (req, res) => {
   console.log("Received POST request with body:", req.body);
-  const { pdfFile, pageNumber, text, replyId } = req.body; //这里的replyId形式是任意，这是否可以解释批注输入框能正常工作而批注显示区却不行？
+  const { pdfFile, pageNumber, text, replyId, positionY } = req.body; // 从 req.body 中提取 positionY
   const token = req.headers.authorization.split(" ")[1];
   let userName;
 
@@ -93,14 +93,14 @@ router.post("/", async (req, res) => {
 
   if (pdfFile) {
     query =
-      "INSERT INTO annotations (pdf_file, page_number, text, userName) VALUES (?, ?, ?, ?)";
-    values = [pdfFile, pageNumber, text, userName];
+      "INSERT INTO annotations (pdf_file, page_number, text, userName, positionY) VALUES (?, ?, ?, ?, ?)";
+    values = [pdfFile, pageNumber, text, userName, positionY]; // 添加 positionY 到 values 中
   }
   // 如果是回帖批注，插入 reply_id 字段
   else if (replyId) {
     query =
-      "INSERT INTO annotations (reply_id, text, userName) VALUES (?, ?, ?)";
-    values = [replyId, text, userName];
+      "INSERT INTO annotations (reply_id, text, userName, positionY) VALUES (?, ?, ?, ?)";
+    values = [replyId, text, userName, positionY]; // 添加 positionY 到 values 中
   }
 
   console.log("Inserting annotation with values:", values);
@@ -117,6 +117,7 @@ router.post("/", async (req, res) => {
       text,
       userName,
       created_at: new Date(),
+      positionY, // 存入数据库
       replyId,
     };
     console.log("Added annotation:", newAnnotation);

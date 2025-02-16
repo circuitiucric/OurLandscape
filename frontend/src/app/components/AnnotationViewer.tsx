@@ -7,14 +7,15 @@ interface Annotation {
   pageNumber?: number;
   text: string;
   userName: string;
-  replyId?: number; // 只关注 replyId
+  replyId?: number;
+  positionY?: number; // 添加 positionY 字段
 }
 
 interface AnnotationViewerProps {
   annotations: Annotation[];
   currentPage?: number;
   file?: string;
-  replyId?: number | null; // 修改为 number | null
+  replyId?: number | null;
 }
 
 const AnnotationViewer: React.FC<AnnotationViewerProps> = ({
@@ -25,7 +26,6 @@ const AnnotationViewer: React.FC<AnnotationViewerProps> = ({
 }) => {
   // 过滤出当前页和相关批注
   const filteredAnnotations = annotations.filter((annotation) => {
-    // 打印每个批注的 replyId 和当前传递的 replyId
     console.log(
       `Checking annotation.replyId: ${annotation.replyId} against replyId: ${replyId}`
     );
@@ -41,7 +41,6 @@ const AnnotationViewer: React.FC<AnnotationViewerProps> = ({
     }
 
     if (replyId !== null && replyId !== undefined) {
-      // 检查 replyId 是否匹配
       console.log(`Checking if ${annotation.replyId} === ${replyId}`);
       return annotation.replyId === replyId;
     }
@@ -49,7 +48,6 @@ const AnnotationViewer: React.FC<AnnotationViewerProps> = ({
     return false;
   });
 
-  // 打印过滤后的批注数据
   console.log("Filtered annotations:", filteredAnnotations);
   if (filteredAnnotations.length === 0) {
     console.log("No annotations found for this replyId:", replyId);
@@ -59,19 +57,16 @@ const AnnotationViewer: React.FC<AnnotationViewerProps> = ({
     console.log("Double clicked annotation ID:", annotationId);
 
     try {
-      // 查询现有帖子
       const existingResponse = await axios.get(
         `http://localhost:3001/api/threads/${annotationId}`
       );
       if (existingResponse.status === 200) {
-        // 如果已有帖子，跳转到该帖子页面
         const threadId = existingResponse.data.id;
         const targetUrl = `http://localhost:3002/threads/${threadId}`;
         window.open(targetUrl, "_blank");
         return;
       }
     } catch (error) {
-      // 如果找不到现有帖子，则继续创建新帖子
       console.log("No existing thread found, creating a new one...");
     }
 
@@ -83,13 +78,11 @@ const AnnotationViewer: React.FC<AnnotationViewerProps> = ({
       const response = await axios.post(
         "http://localhost:3001/api/threads/create",
         {
-          annotationId: annotationId, // 确保键名与后端一致
+          annotationId: annotationId,
           userName: "Current User", // TODO: 使用真实用户信息
         }
       );
       const threadId = response.data.threadId;
-
-      // 跳转到新页面并传递 threadId
       const targetUrl = `http://localhost:3002/threads/${threadId}`;
       window.open(targetUrl, "_blank");
     } catch (error) {
@@ -100,7 +93,6 @@ const AnnotationViewer: React.FC<AnnotationViewerProps> = ({
   return (
     <div>
       <h3>Annotations</h3>
-      {/* 如果没有批注显示提示 */}
       {filteredAnnotations.length === 0 ? (
         <p>No annotations for this reply.</p>
       ) : (
@@ -108,6 +100,8 @@ const AnnotationViewer: React.FC<AnnotationViewerProps> = ({
           <div
             key={annotation.id || `annotation-${annotation.text}`}
             style={{
+              position: "absolute", // 设置绝对定位
+              top: annotation.positionY ? `${annotation.positionY}%` : "0", // 使用 positionY 来调整高度
               backgroundColor: "#d3d3d3",
               marginBottom: "5px",
               padding: "5px",
@@ -115,7 +109,6 @@ const AnnotationViewer: React.FC<AnnotationViewerProps> = ({
               cursor: "pointer",
             }}
             onDoubleClick={() => {
-              // 打印双击时的批注 ID 和相关信息
               console.log("Double clicked annotation:", annotation);
               handleAnnotationDoubleClick(annotation.id!); // 双击事件
             }}

@@ -95,14 +95,25 @@ const PdfViewer = () => {
       return;
     }
 
-    const text = (event.target as any).elements.textarea?.value;
+    const form = event.target as any;
+    const text = form.elements.textarea?.value;
+    const positionY = parseInt(form.elements.positionY?.value, 10); // 获取滑动条值
+
     if (text) {
       console.log("Submitting annotation:", {
         pdfFile: file,
         pageNumber: currentPage,
         text,
+        positionY,
       });
-      const newAnnotation = { pdfFile: file, pageNumber: currentPage, text };
+
+      const newAnnotation = {
+        pdfFile: file,
+        pageNumber: currentPage,
+        text,
+        positionY,
+      };
+
       axios
         .post("http://localhost:3001/api/annotations", newAnnotation, {
           headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
@@ -166,6 +177,18 @@ const PdfViewer = () => {
               resize: "none",
             }}
           />
+
+          {/* 滑动条选择 positionY */}
+          <input
+            type="range"
+            name="positionY"
+            min="0"
+            max="100"
+            step="1"
+            defaultValue="50"
+            style={{ width: "100%", marginTop: "5px" }}
+          />
+
           <button type="submit" style={{ width: "100%", marginTop: "5px" }}>
             Add Annotation
           </button>
