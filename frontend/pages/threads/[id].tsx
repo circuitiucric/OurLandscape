@@ -29,11 +29,13 @@ const ThreadPage = () => {
   const [annotations, setAnnotations] = useState<Annotation[]>([]); // 存储批注
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // 新增状态用于记录滑动条的值，取值范围 0-100，代表百分比
+  const [sliderValue, setSliderValue] = useState<number>(50);
 
   // 获取线程和回复数据
   useEffect(() => {
     if (id) {
-      console.log("Fetching thread for id:", id); // 打印 ID，确保它正确
+      console.log("Fetching thread for id:", id);
       // 获取线程数据
       axios
         .get(`http://localhost:3001/api/threads/${id}`)
@@ -111,7 +113,12 @@ const ThreadPage = () => {
 
     const text = (event.target as any).elements.textarea?.value;
     if (text) {
-      const newAnnotation = { replyId: selectedReplyId, text };
+      // 这里新增 position_y 字段，值为 sliderValue
+      const newAnnotation = {
+        replyId: selectedReplyId,
+        text,
+        position_y: sliderValue,
+      };
       try {
         const response = await axios.post(
           "http://localhost:3001/api/annotations",
@@ -166,7 +173,7 @@ const ThreadPage = () => {
           <strong>Text:</strong>{" "}
           <div
             dangerouslySetInnerHTML={{
-              __html: annotation.text, // 渲染批注文本
+              __html: annotation.text,
             }}
           />
         </div>
@@ -200,7 +207,7 @@ const ThreadPage = () => {
               </div>
               <div
                 dangerouslySetInnerHTML={{
-                  __html: reply.content, // 渲染从数据库获取的回复
+                  __html: reply.content,
                 }}
               />
               <div>{new Date(reply.created_at).toLocaleString()}</div>
@@ -228,6 +235,7 @@ const ThreadPage = () => {
           overflowY: "auto", // 让批注区域可滚动
           backgroundColor: "#f0f0f0",
           padding: "10px",
+          position: "relative",
         }}
       >
         <h3>Annotations for reply {selectedReplyId}</h3>
@@ -253,6 +261,19 @@ const ThreadPage = () => {
               resize: "none",
             }}
           />
+          {/* 新增滑动条，控制批注的垂直位置 */}
+          <div style={{ margin: "10px 0" }}>
+            <label htmlFor="positionRange">批注位置: {sliderValue}%</label>
+            <input
+              id="positionRange"
+              type="range"
+              min="0"
+              max="100"
+              value={sliderValue}
+              onChange={(e) => setSliderValue(Number(e.target.value))}
+              style={{ width: "100%" }}
+            />
+          </div>
           <button type="submit" style={{ width: "100%", marginTop: "5px" }}>
             Add Annotation
           </button>
