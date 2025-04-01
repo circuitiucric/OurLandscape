@@ -81,6 +81,7 @@ router.get("/:id", async (req, res) => {
 // 创建批注
 router.post("/", async (req, res) => {
   try {
+    console.log("Received annotation data:", req.body); // 打印接收的数据
     // 用户认证
     const token = req.headers.authorization?.split(" ")[1];
     if (!token) return res.status(401).json({ error: "Unauthorized" });

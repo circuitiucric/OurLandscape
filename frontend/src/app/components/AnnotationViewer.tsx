@@ -125,7 +125,6 @@ const AnnotationViewer: React.FC<AnnotationViewerProps> = ({
               left: "calc(100% - 300px)",
               top: anno.style.top,
               width: anno.style.width,
-              fontSize: `${12 * viewport.scale}px`,
             }}
             onDoubleClick={() => {
               if (anno.id !== undefined) {
@@ -216,7 +215,7 @@ const annotationStyle: React.CSSProperties = {
   zIndex: 1000,
   pointerEvents: "auto",
   backdropFilter: "blur(2px)",
-  fontSize: "30px", // 调大字体尺寸（原浏览器默认16px）
+  fontSize: "20px", // 调大字体尺寸（原浏览器默认16px）
 };
 
 export default AnnotationViewer;

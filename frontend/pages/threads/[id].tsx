@@ -117,8 +117,12 @@ const ThreadPage = () => {
       const newAnnotation = {
         replyId: selectedReplyId,
         text,
-        position_y: sliderValue,
+        yPosition: sliderValue,
       };
+
+      // 添加日志，检查 newAnnotation
+      console.log("Submitting annotation:", newAnnotation);
+
       try {
         const response = await axios.post(
           "http://localhost:3001/api/annotations",
