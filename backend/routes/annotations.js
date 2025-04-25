@@ -12,6 +12,9 @@ const mapAnnotationFields = (item) => ({
   text: item.text,
   userName: item.user_name,
   yPosition: item.position_y,
+  y2Position: item.y2_position,
+  x1Position: item.x1_position,
+  x2Position: item.x2_position,
   createdAt: item.created_at,
   replyId: item.reply_id,
 });
@@ -20,16 +23,19 @@ const mapAnnotationFields = (item) => ({
 router.get("/", async (req, res) => {
   const { pdfFile, replyId } = req.query;
   let query = `
-    SELECT 
-      annotation_id, 
-      pdf_file, 
-      page_number, 
-      text, 
-      user_name, 
-      position_y, 
-      created_at, 
-      reply_id
-    FROM annotations WHERE 1=1
+SELECT 
+  annotation_id, 
+  pdf_file, 
+  page_number, 
+  text, 
+  user_name, 
+  position_y, 
+  y2_position,
+  x1_position,
+  x2_position,
+  created_at, 
+  reply_id
+FROM annotations WHERE 1=1
   `;
   const params = [];
 
@@ -58,15 +64,19 @@ router.get("/:id", async (req, res) => {
   try {
     const [result] = await db.query(
       `SELECT 
-        annotation_id, 
-        pdf_file, 
-        page_number, 
-        text, 
-        user_name, 
-        position_y, 
-        created_at, 
-        reply_id
-       FROM annotations WHERE annotation_id = ?`,
+  annotation_id, 
+  pdf_file, 
+  page_number, 
+  text, 
+  user_name, 
+  position_y,
+  y2_position,
+  x1_position,
+  x2_position,
+  created_at, 
+  reply_id
+FROM annotations WHERE annotation_id = ?
+`,
       [id]
     );
     result.length > 0
@@ -87,7 +97,16 @@ router.post("/", async (req, res) => {
     if (!token) return res.status(401).json({ error: "Unauthorized" });
 
     const decoded = jwt.verify(token, jwtSecret);
-    const { pdfFile, pageNumber, text, replyId, yPosition } = req.body;
+    const {
+      pdfFile,
+      pageNumber,
+      text,
+      replyId,
+      yPosition,
+      y2Position,
+      x1Position,
+      x2Position,
+    } = req.body;
 
     // 构建插入参数
     let fields = ["text", "user_name", "position_y"];
@@ -99,6 +118,19 @@ router.post("/", async (req, res) => {
     } else if (replyId) {
       fields.push("reply_id");
       values.push(replyId);
+    }
+
+    if (typeof y2Position === "number") {
+      fields.push("y2_position");
+      values.push(y2Position);
+    }
+    if (typeof x1Position === "number") {
+      fields.push("x1_position");
+      values.push(x1Position);
+    }
+    if (typeof x2Position === "number") {
+      fields.push("x2_position");
+      values.push(x2Position);
     }
 
     // 执行插入
@@ -117,6 +149,9 @@ router.post("/", async (req, res) => {
       text,
       userName: decoded.userName,
       yPosition,
+      y2Position,
+      x1Position,
+      x2Position,
       replyId,
       createdAt: new Date(),
     };

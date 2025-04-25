@@ -21,37 +21,48 @@ interface Annotation {
   text: string;
   yPosition: number;
   createdAt: string;
+  x1Position?: number;
+  y2Position?: number;
+  x2Position?: number;
 }
 
 interface ViewportState {
   scrollTop: number;
   height: number;
-  pageDimensions: PageDimension[];
+  pageDimensions: { width: number; height: number }[];
   scale: number;
 }
 
-interface PageDimension {
-  width: number;
-  height: number;
-}
-
-const PdfViewer = () => {
+const PdfViewer: React.FC = () => {
   const searchParams = useSearchParams();
   const file = searchParams?.get("file");
   const initialPage = parseInt(searchParams?.get("page") || "1", 10);
   const fileUrl = `http://localhost:3001/pdf/${file}`;
   const scaleRef = useRef(1);
 
-  const defaultLayoutPluginInstance = defaultLayoutPlugin();
+  // 标记模式
+  const [startMark, setStartMark] = useState<{ x: number; y: number } | null>(
+    null
+  );
+  const [endMark, setEndMark] = useState<{ x: number; y: number } | null>(null);
+  const clickTimer = useRef<NodeJS.Timeout | null>(null);
+
+  // 文本模式
+  const [annotationPanelWidth, setAnnotationPanelWidth] = useState(320);
+  const [wheelDelta, setWheelDelta] = useState(0);
+  const annotationPanelRef = useRef<HTMLDivElement>(null);
+
+  // 批注数据
   const [annotations, setAnnotations] = useState<Annotation[]>([]);
   const [clickPosition, setClickPosition] = useState<{
     clientY: number;
     pdfY: number;
   } | null>(null);
   const [currentPage, setCurrentPage] = useState(initialPage);
+
+  // PDF viewport 信息
   const containerRef = useRef<HTMLDivElement>(null);
   const innerContainerRef = useRef<HTMLDivElement | null>(null);
-
   const [viewport, setViewport] = useState<ViewportState>({
     scrollTop: 0,
     height: 0,
@@ -59,64 +70,112 @@ const PdfViewer = () => {
     scale: 1,
   });
 
-  const getAuthHeader = () => {
-    const token = localStorage.getItem("token");
-    if (!token) {
-      alert("请先登录");
-      window.location.href = "/login";
-      return {};
-    }
-    return { headers: { Authorization: `Bearer ${token}` } };
-  };
+  // 用于控制什么时候开始渲染 AnnotationViewer
+  const [viewportReady, setViewportReady] = useState(false);
 
+  // 批注区左侧偏移
+  const [leftOffset, setLeftOffset] = useState(0);
+
+  const defaultLayoutPluginInstance = defaultLayoutPlugin();
+
+  // 禁止整个页面滚动
   useEffect(() => {
-    const findScrollContainer = () => {
-      const container = document.querySelector(
-        ".rpv-core__inner-pages--vertical"
-      ) as HTMLDivElement;
-      if (container) {
-        innerContainerRef.current = container;
-        updateViewport();
-        container.addEventListener("scroll", handleScroll);
-      } else {
-        setTimeout(findScrollContainer, 100);
-      }
-    };
-    findScrollContainer();
-
+    document.body.style.overflow = "hidden";
     return () => {
-      innerContainerRef.current?.removeEventListener("scroll", handleScroll);
+      document.body.style.overflow = "";
     };
   }, []);
 
-  // 修改视口状态更新逻辑
-  const updateViewport = useCallback(() => {
-    const container = innerContainerRef.current;
-    if (!container) return;
+  // 计算 leftOffset
+  const computeLeftOffset = useCallback(() => {
+    const c = containerRef.current;
+    if (c) {
+      setLeftOffset(c.getBoundingClientRect().left);
+    }
+  }, []);
 
+  // 更新 viewport 数据
+  const updateViewport = useCallback(() => {
+    const c = innerContainerRef.current;
+    if (!c) return;
     requestAnimationFrame(() => {
       const scale = scaleRef.current;
-      setViewport((prev) => ({
-        ...prev,
-        // 存储未缩放的滚动位置
-        scrollTop: container.scrollTop / scale,
-        height: container.clientHeight,
-        scale: scale,
-        pageDimensions: Array.from(
-          container.querySelectorAll(".rpv-core__page")
-        ).map((page) => ({
-          width: page.clientWidth,
-          height: page.clientHeight,
-        })),
-      }));
+      setViewport({
+        scrollTop: c.scrollTop / scale,
+        height: c.clientHeight,
+        scale,
+        pageDimensions: Array.from(c.querySelectorAll(".rpv-core__page")).map(
+          (p) => ({
+            width: p.clientWidth,
+            height: p.clientHeight,
+          })
+        ),
+      });
     });
   }, []);
 
-  const handleScroll = useCallback(() => {
-    updateViewport();
+  // 初次挂载：找到内部滚动容器
+  useEffect(() => {
+    const find = () => {
+      const c = document.querySelector(
+        ".rpv-core__inner-pages--vertical"
+      ) as HTMLDivElement;
+      if (c) {
+        innerContainerRef.current = c;
+        computeLeftOffset();
+        updateViewport();
+        c.addEventListener("scroll", updateViewport);
+      } else {
+        setTimeout(find, 100);
+      }
+    };
+    find();
+    return () => {
+      innerContainerRef.current?.removeEventListener("scroll", updateViewport);
+    };
+  }, [computeLeftOffset, updateViewport]);
+
+  // 拖拽宽度后更新偏移
+  useEffect(() => {
+    computeLeftOffset();
+  }, [annotationPanelWidth, computeLeftOffset]);
+
+  // 窗口拉伸时更新偏移 & viewport
+  useEffect(() => {
+    const onResize = () => {
+      computeLeftOffset();
+      updateViewport();
+    };
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, [computeLeftOffset, updateViewport]);
+
+  // 文档加载完成后，执行一次缩小操作，使annotationviewer读取到正确的scale
+  const handleDocumentLoad = useCallback(() => {
+    setTimeout(() => {
+      // 1. 查找缩小按钮
+      const zoomOutBtn = document.querySelector(
+        'button[aria-label="Zoom out"]'
+      ) as HTMLButtonElement;
+
+      if (zoomOutBtn) {
+        // 2. 点击缩小按钮
+        zoomOutBtn.click();
+
+        // 3. 等待 scale 更新完成（稍微延迟一点）
+        setTimeout(() => {
+          updateViewport(); // 确保 scale 是缩小后的
+          setViewportReady(true); // 现在才允许渲染批注
+        }, 300); // 可以根据实际插件缩放动画时间调整
+      } else {
+        console.warn("未找到缩小按钮，跳过自动缩放");
+        updateViewport();
+        setViewportReady(true);
+      }
+    }, 300); // 稍微等待 PDF 插件布局完成（如侧边栏等）
   }, [updateViewport]);
 
-  // 关键修改：删除所有滚动位置补偿逻辑
+  // 用户缩放时更新 scale & viewport
   const handleZoom = useCallback(
     (zoom: { scale: number }) => {
       scaleRef.current = zoom.scale;
@@ -125,98 +184,124 @@ const PdfViewer = () => {
     [updateViewport]
   );
 
-  // 修改点击位置计算逻辑
-  const handleDocumentClick = useCallback((event: MouseEvent) => {
-    const container = innerContainerRef.current;
-    if (!container || event.ctrlKey) return;
+  // 处理选点点击
+  const handleDocumentClick = useCallback(
+    (ev: MouseEvent) => {
+      const c = innerContainerRef.current;
+      if (!c || ev.ctrlKey) return;
+      const rect = c.getBoundingClientRect();
+      const scale = scaleRef.current;
+      const x = (ev.clientX - rect.left) / scale;
+      const y = (ev.clientY - rect.top) / scale;
+      const pdfY = c.scrollTop / scale + y;
 
-    const rect = container.getBoundingClientRect();
-    const scale = scaleRef.current;
-
-    // 计算点击位置相对于视口的Y坐标
-    const clickYRelative = event.clientY - rect.top;
-
-    // 如果点击位置距离顶部小于75px，则不显示批注框
-    if (clickYRelative < 75) {
-      return;
+      if (clickTimer.current) {
+        clearTimeout(clickTimer.current);
+        clickTimer.current = null;
+        setStartMark(null);
+        setEndMark(null);
+        setClickPosition(null);
+        return;
+      }
+      clickTimer.current = setTimeout(() => {
+        clickTimer.current = null;
+        if (!startMark) {
+          setStartMark({ x, y: pdfY });
+        } else {
+          setEndMark({ x, y: pdfY });
+          setClickPosition({ clientY: ev.clientY, pdfY });
+        }
+      }, 250);
+    },
+    [startMark]
+  );
+  useEffect(() => {
+    const c = containerRef.current;
+    if (c) {
+      c.addEventListener("click", handleDocumentClick);
+      return () => c.removeEventListener("click", handleDocumentClick);
     }
+  }, [handleDocumentClick]);
 
-    // 点击位置转换到未缩放坐标系
-    const clickY = (event.clientY - rect.top) / scale;
+  // 拉取批注
+  useEffect(() => {
+    if (!file) return;
+    axios
+      .get(`http://localhost:3001/api/annotations?pdfFile=${file}`, {
+        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+      })
+      .then((r) => setAnnotations(r.data))
+      .catch(console.error);
+  }, [file]);
 
-    // 滚动位置转换到未缩放坐标系
-    const scrollTopRaw = container.scrollTop / scale;
-
-    // 最终保存的批注位置（统一基于原始文档坐标系）
-    const pdfY = scrollTopRaw + clickY;
-
-    setClickPosition({
-      clientY: event.clientY,
-      pdfY: pdfY, // 这个值将作为yPosition传给后端
-    });
+  // 批注区滚轮
+  useEffect(() => {
+    const p = annotationPanelRef.current;
+    if (!p) return;
+    const onWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      setWheelDelta((r) => r + e.deltaY);
+    };
+    p.addEventListener("wheel", onWheel, { passive: false });
+    return () => p.removeEventListener("wheel", onWheel);
   }, []);
 
+  // 拖拽改变宽度
+  const handleDragMouseDown = (e: React.MouseEvent) => {
+    const startX = e.clientX;
+    const startW = annotationPanelWidth;
+    const onMove = (m: MouseEvent) => {
+      const delta = startX - m.clientX;
+      setAnnotationPanelWidth(Math.max(200, startW + delta));
+    };
+    const onUp = () => {
+      document.removeEventListener("mousemove", onMove);
+      document.removeEventListener("mouseup", onUp);
+    };
+    document.addEventListener("mousemove", onMove);
+    document.addEventListener("mouseup", onUp);
+  };
+
+  // 提交批注
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const formData = new FormData(e.currentTarget as HTMLFormElement);
-    const text = formData.get("text") as string;
-
-    if (!text.trim() || !clickPosition) return;
-
+    const text = new FormData(e.currentTarget as HTMLFormElement).get(
+      "text"
+    ) as string;
+    if (!text.trim() || !startMark || !endMark) return;
     try {
-      const response = await axios.post(
+      const r = await axios.post(
         "http://localhost:3001/api/annotations",
         {
           pdfFile: file,
           pageNumber: currentPage,
-          text: text,
-          yPosition: clickPosition.pdfY,
+          text,
+          yPosition: startMark.y,
+          x1Position: startMark.x,
+          y2Position: endMark.y,
+          x2Position: endMark.x,
         },
-        getAuthHeader()
+        {
+          headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+        }
       );
-
-      setAnnotations([...annotations, response.data]);
+      setAnnotations((a) => [...a, r.data]);
       setClickPosition(null);
-    } catch (error) {
-      console.error("批注提交失败:", error);
+      setStartMark(null);
+      setEndMark(null);
+    } catch (err) {
+      console.error(err);
     }
   };
-
-  useEffect(() => {
-    const container = containerRef.current;
-    if (!container) return;
-    container.addEventListener("click", handleDocumentClick);
-    return () => container.removeEventListener("click", handleDocumentClick);
-  }, [handleDocumentClick]);
-
-  useEffect(() => {
-    if (!file) return;
-    axios
-      .get(
-        `http://localhost:3001/api/annotations?pdfFile=${file}`,
-        getAuthHeader()
-      )
-      .then((response) => {
-        setAnnotations(
-          response.data.map((a: any) => ({
-            id: a.id,
-            pdfFile: a.pdfFile,
-            pageNumber: a.pageNumber,
-            text: a.text,
-            yPosition: a.yPosition,
-            createdAt: a.createdAt,
-            userName: a.userName,
-          }))
-        );
-      })
-      .catch(console.error);
-  }, [file]);
 
   return (
     <div style={{ display: "flex", height: "100vh" }}>
       <style>{customStyles}</style>
+
+      {/* 左侧占位 */}
       <div style={{ flex: 1, backgroundColor: "#f5f5f5" }} />
 
+      {/* PDF 渲染区 */}
       <div
         ref={containerRef}
         style={{
@@ -233,74 +318,97 @@ const PdfViewer = () => {
             initialPage={initialPage - 1}
             onPageChange={({ currentPage }) => setCurrentPage(currentPage + 1)}
             onZoom={handleZoom}
+            onDocumentLoad={handleDocumentLoad}
           />
         </Worker>
       </div>
 
+      {/* 右侧批注区 */}
       <div
+        ref={annotationPanelRef}
         style={{
-          flex: 1,
+          width: annotationPanelWidth,
           borderLeft: "1px solid #ddd",
-          padding: "20px",
-          overflowY: "auto",
+          padding: 20,
           backgroundColor: "#f5f5f5",
           boxShadow: "-2px 0 5px rgba(0,0,0,0.1)",
           position: "relative",
-          minWidth: "320px",
+          overflow: "hidden",
         }}
       >
-        <h3>文档批注（第 {currentPage} 页）</h3>
-        <AnnotationViewer annotations={annotations} viewport={viewport} />
+        <h3>文档批注</h3>
+        {viewportReady && (
+          <AnnotationViewer
+            annotations={annotations}
+            viewport={viewport}
+            leftOffset={leftOffset}
+            displayMode="text"
+            wheelDelta={wheelDelta}
+          />
+        )}
+        <div
+          style={{
+            position: "absolute",
+            left: 0,
+            top: 0,
+            bottom: 0,
+            width: 5,
+            cursor: "col-resize",
+            zIndex: 1000,
+          }}
+          onMouseDown={handleDragMouseDown}
+        />
       </div>
 
+      {/* PDF 上标记层 */}
+      <div
+        style={{
+          position: "absolute",
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          pointerEvents: "none",
+          zIndex: 10,
+        }}
+      >
+        {viewportReady && (
+          <AnnotationViewer
+            annotations={annotations}
+            viewport={viewport}
+            startMark={startMark}
+            endMark={endMark}
+            leftOffset={leftOffset}
+            displayMode="mark"
+          />
+        )}
+      </div>
+
+      {/* 提交表单 */}
       {clickPosition && (
         <div
           style={{
             position: "fixed",
-            left: "calc(75% + 30px)",
+            left: `calc(${annotationPanelWidth}px + 30px)`,
             top: clickPosition.clientY,
             zIndex: 9999,
-            background: "white",
+            background: "#fff",
             boxShadow: "0 2px 10px rgba(0,0,0,0.2)",
-            borderRadius: "8px",
-            padding: "16px",
-            width: "400px",
+            borderRadius: 8,
+            padding: 16,
+            width: 400,
           }}
         >
           <form
             onSubmit={handleSubmit}
             style={{
               display: "flex",
-              gap: "10px",
-              alignItems: "stretch", // 关键属性：拉伸子元素高度
-              height: "92px", // 输入框80px + 边框2px*2
+              gap: 10,
+              alignItems: "stretch",
+              height: 92,
             }}
           >
-            {/* 发送按钮 */}
-            <button
-              type="submit"
-              style={{
-                background: "#808080",
-                color: "white",
-                border: "none",
-                padding: "0 20px",
-                borderRadius: "4px",
-                cursor: "pointer",
-                flexShrink: 0,
-                transition: "background 0.3s",
-                // 设置与输入框相同的计算高度
-                height: "calc(100% - 7px)", // 补偿容器边框
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-              onMouseOver={(e) => (e.currentTarget.style.background = "#666")}
-              onMouseOut={(e) => (e.currentTarget.style.background = "#808080")}
-            >
-              submit
-            </button>
-
-            {/* 输入框 */}
+            <button type="submit">submit</button>
             <textarea
               name="text"
               placeholder="输入批注内容..."
@@ -308,13 +416,11 @@ const PdfViewer = () => {
               required
               style={{
                 flex: 1,
-                height: "80px", // 固定初始高度
-                padding: "8px",
+                height: 80,
+                padding: 8,
                 border: "1px solid #ddd",
-                borderRadius: "4px",
-                color: "#000",
+                borderRadius: 4,
                 resize: "vertical",
-                boxSizing: "border-box", // 确保边框不增加总高度
               }}
             />
           </form>

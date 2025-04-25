@@ -1,4 +1,4 @@
-import React, { useMemo } from "react";
+import React, { useMemo, useState, useEffect } from "react";
 import axios from "axios";
 
 export interface Annotation {
@@ -7,11 +7,13 @@ export interface Annotation {
   pageNumber?: number;
   text: string;
   userName: string;
-  // 新版 pdf-viewer 模式使用的字段
   yPosition?: number;
   createdAt?: string;
-  // 帖子模式使用的字段
   replyId?: number;
+  x1Position?: number;
+  y2Position?: number;
+  x2Position?: number;
+  indentOffset?: number;
 }
 
 export interface ViewportState {
@@ -23,12 +25,15 @@ export interface ViewportState {
 
 interface AnnotationViewerProps {
   annotations: Annotation[];
-  // pdf-viewer 模式相关属性
   viewport?: ViewportState;
-  // 帖子（回复）模式相关属性
   currentPage?: number;
   file?: string;
   replyId?: number | null;
+  startMark?: { x: number; y: number } | null;
+  endMark?: { x: number; y: number } | null;
+  leftOffset?: number;
+  displayMode?: "text" | "mark";
+  wheelDelta?: number;
 }
 
 const AnnotationViewer: React.FC<AnnotationViewerProps> = ({
@@ -37,10 +42,22 @@ const AnnotationViewer: React.FC<AnnotationViewerProps> = ({
   currentPage,
   file,
   replyId,
+  startMark,
+  endMark,
+  leftOffset,
+  displayMode = "text",
+  wheelDelta = 0,
 }) => {
-  // 双击批注统一处理逻辑
+  const [isReadyToRender, setIsReadyToRender] = useState(false);
+
+  // 等待 viewport.scale 初始化
+  useEffect(() => {
+    if (viewport && viewport.scale > 0) {
+      setIsReadyToRender(true);
+    }
+  }, [viewport]);
+
   const handleAnnotationDoubleClick = async (annotationId: number) => {
-    console.log("Double clicked annotation ID:", annotationId);
     try {
       const existingResponse = await axios.get(
         `http://localhost:3001/api/threads/${annotationId}`
@@ -50,148 +67,268 @@ const AnnotationViewer: React.FC<AnnotationViewerProps> = ({
         window.open(`http://localhost:3002/threads/${threadId}`, "_blank");
         return;
       }
-    } catch (error) {
-      console.log("No existing thread found, creating a new one...");
+    } catch {
+      // no existing thread
     }
     try {
       const response = await axios.post(
         "http://localhost:3001/api/threads/create",
-        {
-          annotationId: annotationId,
-          userName: "Current User", // TODO: 替换为真实用户信息
-        }
+        { annotationId, userName: "Current User" }
       );
-      const threadId = response.data.threadId;
-      window.open(`http://localhost:3002/threads/${threadId}`, "_blank");
-    } catch (error) {
-      console.error("Error creating thread:", error);
+      window.open(
+        `http://localhost:3002/threads/${response.data.threadId}`,
+        "_blank"
+      );
+    } catch (err) {
+      console.error(err);
     }
   };
 
-  // 如果传入了 viewport，则认为当前为 pdf-viewer 模式
-  if (viewport) {
-    // 使用新版定位逻辑计算批注的样式位置
-    const positionedAnnotations = useMemo(() => {
-      return annotations.map((anno) => {
-        // 若 pageNumber 或 yPosition 未传入，则采用默认值
-        const pageNumber = anno.pageNumber || 1;
-        const yPosition = anno.yPosition || 0;
-        const { pageDimensions, scrollTop, scale } = viewport;
+  // 预计算位置
+  const positionedAnnotations = useMemo(() => {
+    if (!viewport || !isReadyToRender) return [];
+    return annotations.map((anno) => {
+      const pageNumber = anno.pageNumber || 1;
+      const yPosition = anno.yPosition || 0;
+      const { pageDimensions, scrollTop, scale } = viewport;
 
-        console.log("scrollTop:", scrollTop); // 打印 scrollTop 确认是否正确更新
+      const pageOffset = pageDimensions
+        .slice(0, pageNumber - 1)
+        .reduce((acc, curr) => acc + curr.height, 0);
+      const pageHeight = pageDimensions[pageNumber - 1]?.height || 842;
+      const normalizedY = (yPosition / 842) * pageHeight;
+      const top = (pageOffset + normalizedY - scrollTop) * scale;
+      const baseLeft = (pageDimensions[0]?.width || 612) * scale + 24;
 
-        // 计算当前页之前的累计高度（不受缩放影响）
-        const pageOffset = pageDimensions
-          .slice(0, pageNumber - 1)
-          .reduce((acc, curr) => acc + curr.height, 0);
+      return {
+        ...anno,
+        style: { baseLeft, top, width: 360, opacity: 1 },
+      };
+    });
+  }, [annotations, viewport, isReadyToRender]);
 
-        // 获取当前页实际高度（默认值842）
-        const pageHeight = pageDimensions[pageNumber - 1]?.height || 842;
-        // 计算批注在当前页面内的实际位置
-        const normalizedY = (yPosition / 842) * pageHeight;
-        // 计算批注相对于整个文档的绝对位置并应用缩放
-        const top = (pageOffset + normalizedY - scrollTop) * scale;
-        // 固定批注区距离页面左侧的位置（例如：页面宽度+偏移24px）
-        const left = (pageDimensions[0]?.width || 612) * scale + 24;
+  // 计算重叠偏移
+  const computedAnnotations = useMemo(() => {
+    if (!positionedAnnotations.length) return [];
+    const annos = [...positionedAnnotations];
+    annos.sort((a, b) => a.style.top - b.style.top);
+    const threshold = 80;
+    const indentStep = 360;
+    annos.forEach((anno, i) => {
+      let indent = 0;
+      for (let j = 0; j < i; j++) {
+        if (Math.abs(anno.style.top - annos[j].style.top) < threshold) {
+          indent = Math.max(indent, (annos[j].indentOffset || 0) + indentStep);
+        }
+      }
+      anno.indentOffset = indent;
+    });
+    return annos;
+  }, [positionedAnnotations]);
 
-        return {
-          ...anno,
-          style: {
-            left: `${left}px`,
+  // 标记元素
+  const markerElements = useMemo<JSX.Element[]>(() => {
+    if (!viewport || !isReadyToRender) return [];
+    const markers: JSX.Element[] = [];
+    const { scrollTop, scale } = viewport;
+    if (startMark) {
+      const top = (startMark.y - scrollTop + 10) * scale;
+      const left = startMark.x * scale + (leftOffset || 0) + 20;
+      markers.push(
+        <div
+          key="start-marker"
+          style={{
+            position: "absolute",
             top: `${top}px`,
-            width: "280px",
-            opacity: 1,
-          },
-        };
-      });
-    }, [annotations, viewport]);
+            left: `${left}px`,
+            fontSize: 42,
+            color: "red",
+            pointerEvents: "none",
+            zIndex: 1100,
+          }}
+        >
+          「
+        </div>
+      );
+    }
+    if (endMark) {
+      const top = (endMark.y - scrollTop + 10) * viewport.scale - 34;
+      const left = endMark.x * scale + (leftOffset || 0) + 32;
+      markers.push(
+        <div
+          key="end-marker"
+          style={{
+            position: "absolute",
+            top: `${top}px`,
+            left: `${left}px`,
+            fontSize: 42,
+            color: "red",
+            pointerEvents: "none",
+            zIndex: 1100,
+          }}
+        >
+          」
+        </div>
+      );
+    }
+    return markers;
+  }, [startMark, endMark, viewport, leftOffset, isReadyToRender]);
 
-    const visibleAnnotations = useMemo(() => {
-      const { scrollTop, height } = viewport;
-      return positionedAnnotations.filter((anno) => {
-        const top = parseFloat(anno.style.top);
-        return top >= scrollTop - height && top <= scrollTop + height * 2;
-      });
-    }, [positionedAnnotations, viewport]);
-
-    return (
-      <div style={containerStyle}>
-        {positionedAnnotations.map((anno) => (
+  const historicalMarkers = useMemo<JSX.Element[]>(() => {
+    if (!viewport || !isReadyToRender) return [];
+    const markers: JSX.Element[] = [];
+    const { scrollTop, scale } = viewport;
+    annotations.forEach((anno) => {
+      if (
+        typeof anno.yPosition === "number" &&
+        typeof anno.x1Position === "number"
+      ) {
+        const top = (anno.yPosition - scrollTop + 10) * scale;
+        const left = anno.x1Position * scale + (leftOffset || 0) + 20;
+        markers.push(
           <div
-            key={anno.id || `annotation-${anno.text}`}
-            id={`anno-${anno.id}`}
+            key={`anno-start-${anno.id}`}
             style={{
-              ...annotationStyle,
-              left: "calc(100% - 300px)",
-              top: anno.style.top,
-              width: anno.style.width,
-            }}
-            onDoubleClick={() => {
-              if (anno.id !== undefined) {
-                handleAnnotationDoubleClick(anno.id);
-              } else {
-                console.error("Annotation ID is undefined:", anno);
-              }
+              position: "absolute",
+              top: `${top}px`,
+              left: `${left}px`,
+              fontSize: 42,
+              color: "blue",
+              pointerEvents: "none",
+              zIndex: 1100,
             }}
           >
-            <div className="annotation-content">
-              <strong>{anno.userName}</strong>
-              <p>{anno.text}</p>
-              {anno.createdAt && (
-                <time>{new Date(anno.createdAt).toLocaleString()}</time>
-              )}
-            </div>
+            「
           </div>
-        ))}
-      </div>
-    );
-  } else {
-    // 帖子模式：根据传入的 file/currentPage 或 replyId 筛选对应的批注
-    const filteredAnnotations = annotations.filter((annotation) => {
-      if (file) {
-        return (
-          annotation.pdfFile === file && annotation.pageNumber === currentPage
         );
       }
-      if (replyId !== null && replyId !== undefined) {
-        return annotation.replyId === replyId;
+      if (
+        typeof anno.y2Position === "number" &&
+        typeof anno.x2Position === "number"
+      ) {
+        const top = (anno.y2Position - scrollTop + 10) * scale - 34;
+        const left = anno.x2Position * scale + (leftOffset || 0) + 32;
+        markers.push(
+          <div
+            key={`anno-end-${anno.id}`}
+            style={{
+              position: "absolute",
+              top: `${top}px`,
+              left: `${left}px`,
+              fontSize: 42,
+              color: "blue",
+              pointerEvents: "none",
+              zIndex: 1100,
+            }}
+          >
+            」
+          </div>
+        );
       }
-      return false;
     });
+    return markers;
+  }, [annotations, viewport, leftOffset, isReadyToRender]);
 
+  // 渲染文字模式
+  if (displayMode === "text") {
     return (
-      <div>
-        <h3>Annotations</h3>
-        {filteredAnnotations.length === 0 ? (
-          <p>No annotations for this reply.</p>
-        ) : (
-          filteredAnnotations.map((annotation) => (
+      <div style={containerStyle}>
+        {computedAnnotations.map((anno) => {
+          const overallLeft = (wheelDelta || 0) + (anno.indentOffset || 0);
+          return (
             <div
-              key={annotation.id || `annotation-${annotation.text}`}
+              key={anno.id}
+              id={`anno-${anno.id}`}
               style={{
-                position: "absolute", // 绝对定位，可根据需要调整
-                top: annotation.yPosition ? `${annotation.yPosition}%` : "0",
-                backgroundColor: "#d3d3d3",
-                marginBottom: "5px",
-                padding: "5px",
-                borderRadius: "3px",
-                cursor: "pointer",
+                ...annotationStyle,
+                left: `${overallLeft}px`,
+                top: `${anno.style.top}px`,
+                maxWidth: "360px",
+                minWidth: "240px",
+                width: "fit-content",
+                whiteSpace: "pre-wrap",
+                wordBreak: "break-word",
               }}
-              onDoubleClick={() => {
-                if (annotation.id) {
-                  handleAnnotationDoubleClick(annotation.id);
-                }
-              }}
+              onDoubleClick={() => handleAnnotationDoubleClick(anno.id!)}
             >
-              <p style={{ margin: 0 }}>
-                <strong>{annotation.userName}</strong>: {annotation.text}
-              </p>
+              <div className="annotation-content">
+                <div
+                  style={{
+                    fontSize: "16px",
+                    fontWeight: "bold",
+                    marginBottom: 8,
+                  }}
+                >
+                  {anno.text.split("\n").map((para, idx) => (
+                    <p key={idx} style={{ margin: 0 }}>
+                      {para}
+                    </p>
+                  ))}
+                </div>
+                {anno.createdAt && (
+                  <div style={{ fontSize: "12px", color: "#555" }}>
+                    <time>{new Date(anno.createdAt).toLocaleString()}</time>{" "}
+                    {anno.userName}
+                  </div>
+                )}
+              </div>
             </div>
-          ))
-        )}
+          );
+        })}
       </div>
     );
   }
+
+  // 渲染标记模式
+  if (displayMode === "mark") {
+    return (
+      <div style={containerStyle}>
+        {[...markerElements, ...historicalMarkers]}
+      </div>
+    );
+  }
+
+  // 帖子模式
+  const filteredAnnotations = annotations.filter((annotation) => {
+    if (file)
+      return (
+        annotation.pdfFile === file && annotation.pageNumber === currentPage
+      );
+    if (replyId != null) return annotation.replyId === replyId;
+    return false;
+  });
+
+  return (
+    <div>
+      <h3>Annotations</h3>
+      {filteredAnnotations.length === 0 ? (
+        <p>No annotations for this reply.</p>
+      ) : (
+        filteredAnnotations.map((annotation) => (
+          <div
+            key={annotation.id}
+            style={{
+              position: "absolute",
+              top: annotation.yPosition ? `${annotation.yPosition}%` : "0",
+              backgroundColor: "#d3d3d3",
+              marginBottom: 5,
+              padding: 5,
+              borderRadius: 3,
+              cursor: "pointer",
+            }}
+            onDoubleClick={() => handleAnnotationDoubleClick(annotation.id!)}
+          >
+            <strong>{annotation.userName}</strong>
+            {annotation.text.split("\n").map((para, idx) => (
+              <p key={idx} style={{ margin: 0 }}>
+                {para}
+              </p>
+            ))}
+          </div>
+        ))
+      )}
+    </div>
+  );
 };
 
 const containerStyle: React.CSSProperties = {
@@ -205,17 +342,20 @@ const containerStyle: React.CSSProperties = {
 
 const annotationStyle: React.CSSProperties = {
   position: "absolute",
-  backgroundColor: "rgba(245, 245, 245, 0.95)", // 淡灰色背景带透明度
-  color: "#000000", // 字体颜色设置为黑色
+  backgroundColor: "rgba(245, 245, 245, 0.95)",
+  color: "#000",
   borderLeft: "4px solid #FFC107",
-  padding: "12px",
-  borderRadius: "6px",
-  boxShadow: "0 2px 8px rgba(0, 0, 0, 0.15)",
+  padding: 16,
+  borderRadius: 8,
+  boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
   transition: "transform 0.15s ease-out",
   zIndex: 1000,
   pointerEvents: "auto",
   backdropFilter: "blur(2px)",
-  fontSize: "20px", // 调大字体尺寸（原浏览器默认16px）
+  fontSize: 16,
+  lineHeight: 1.6,
+  fontFamily: "sans-serif",
+  width: 360,
 };
 
 export default AnnotationViewer;
