@@ -57,14 +57,26 @@ const AnnotationViewer: React.FC<AnnotationViewerProps> = ({
     }
   }, [viewport]);
 
+  //新窗口打开帖子
   const handleAnnotationDoubleClick = async (annotationId: number) => {
+    const popupWidth = 600;
+    const popupHeight = 600;
+    const left = window.innerWidth - popupWidth - 20;
+    const top = (window.innerHeight - popupHeight) / 2;
+
+    const windowFeatures = `width=${popupWidth},height=${popupHeight},left=${left},top=${top},noopener,noreferrer`;
+
     try {
       const existingResponse = await axios.get(
         `http://localhost:3001/api/threads/${annotationId}`
       );
       if (existingResponse.status === 200) {
         const threadId = existingResponse.data.id;
-        window.open(`http://localhost:3002/threads/${threadId}`, "_blank");
+        window.open(
+          `http://localhost:3002/threads/${threadId}`,
+          "_blank",
+          windowFeatures
+        );
         return;
       }
     } catch {
@@ -77,7 +89,8 @@ const AnnotationViewer: React.FC<AnnotationViewerProps> = ({
       );
       window.open(
         `http://localhost:3002/threads/${response.data.threadId}`,
-        "_blank"
+        "_blank",
+        windowFeatures
       );
     } catch (err) {
       console.error(err);
