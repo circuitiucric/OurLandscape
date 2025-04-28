@@ -206,7 +206,7 @@ const AnnotationViewer: React.FC<AnnotationViewerProps> = ({
               top: `${top}px`,
               left: `${left}px`,
               fontSize: 42,
-              color: "blue",
+              color: "#d3d3d3",
               pointerEvents: "none",
               zIndex: 1100,
             }}
@@ -229,7 +229,7 @@ const AnnotationViewer: React.FC<AnnotationViewerProps> = ({
               top: `${top}px`,
               left: `${left}px`,
               fontSize: 42,
-              color: "blue",
+              color: "#d3d3d3",
               pointerEvents: "none",
               zIndex: 1100,
             }}
