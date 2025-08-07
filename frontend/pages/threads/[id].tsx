@@ -243,7 +243,11 @@ const ThreadPage = () => {
         }}
       >
         <h3>Annotations for reply {selectedReplyId}</h3>
-        <AnnotationViewer annotations={annotations} replyId={selectedReplyId} />
+        <AnnotationViewer
+          annotations={annotations}
+          replyId={selectedReplyId}
+          displayMode="thread"
+        />
 
         {/* 批注输入框 */}
         <form

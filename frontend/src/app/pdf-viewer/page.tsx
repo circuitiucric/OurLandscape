@@ -70,6 +70,11 @@ const PdfViewer: React.FC = () => {
     scale: 1,
   });
 
+  // 批注悬停状态
+  const [hoveredAnnotationId, setHoveredAnnotationId] = useState<number | null>(
+    null
+  );
+
   // 用于控制什么时候开始渲染 AnnotationViewer
   const [viewportReady, setViewportReady] = useState(false);
 
@@ -323,6 +328,32 @@ const PdfViewer: React.FC = () => {
         </Worker>
       </div>
 
+      {/* PDF 上标记层 */}
+      <div
+        style={{
+          position: "absolute",
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          pointerEvents: "none",
+          zIndex: 10,
+        }}
+      >
+        {viewportReady && (
+          <AnnotationViewer
+            annotations={annotations}
+            viewport={viewport}
+            startMark={startMark}
+            endMark={endMark}
+            leftOffset={leftOffset}
+            displayMode="mark"
+            hoveredAnnotationId={hoveredAnnotationId}
+            onAnnotationHover={setHoveredAnnotationId}
+          />
+        )}
+      </div>
+
       {/* 右侧批注区 */}
       <div
         ref={annotationPanelRef}
@@ -344,6 +375,8 @@ const PdfViewer: React.FC = () => {
             leftOffset={leftOffset}
             displayMode="text"
             wheelDelta={wheelDelta}
+            hoveredAnnotationId={hoveredAnnotationId}
+            onAnnotationHover={setHoveredAnnotationId}
           />
         )}
         <div
@@ -358,30 +391,6 @@ const PdfViewer: React.FC = () => {
           }}
           onMouseDown={handleDragMouseDown}
         />
-      </div>
-
-      {/* PDF 上标记层 */}
-      <div
-        style={{
-          position: "absolute",
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          pointerEvents: "none",
-          zIndex: 10,
-        }}
-      >
-        {viewportReady && (
-          <AnnotationViewer
-            annotations={annotations}
-            viewport={viewport}
-            startMark={startMark}
-            endMark={endMark}
-            leftOffset={leftOffset}
-            displayMode="mark"
-          />
-        )}
       </div>
 
       {/* 提交表单 */}

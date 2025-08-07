@@ -14,6 +14,7 @@ export interface Annotation {
   y2Position?: number;
   x2Position?: number;
   indentOffset?: number;
+  expectedWidth?: number;
 }
 
 export interface ViewportState {
@@ -32,8 +33,10 @@ interface AnnotationViewerProps {
   startMark?: { x: number; y: number } | null;
   endMark?: { x: number; y: number } | null;
   leftOffset?: number;
-  displayMode?: "text" | "mark";
+  displayMode?: "text" | "mark" | "thread";
   wheelDelta?: number;
+  hoveredAnnotationId?: number | null;
+  onAnnotationHover?: (id: number | null) => void;
 }
 
 const AnnotationViewer: React.FC<AnnotationViewerProps> = ({
@@ -47,6 +50,8 @@ const AnnotationViewer: React.FC<AnnotationViewerProps> = ({
   leftOffset,
   displayMode = "text",
   wheelDelta = 0,
+  hoveredAnnotationId,
+  onAnnotationHover,
 }) => {
   const [isReadyToRender, setIsReadyToRender] = useState(false);
 
@@ -125,17 +130,69 @@ const AnnotationViewer: React.FC<AnnotationViewerProps> = ({
     if (!positionedAnnotations.length) return [];
     const annos = [...positionedAnnotations];
     annos.sort((a, b) => a.style.top - b.style.top);
-    const threshold = 80;
-    const indentStep = 360;
+
+    // 计算每个批注的预期宽度（基于文本长度）
+    annos.forEach((anno) => {
+      // 计算文本的预期宽度（假设每个中文字符约18px，英文字符约9px）
+      const textWidth = anno.text.split("").reduce((width, char) => {
+        return width + (/[\u4e00-\u9fa5]/.test(char) ? 18 : 9);
+      }, 0);
+
+      // 考虑padding和其他内容的空间，并确保宽度在合理范围内
+      const contentWidth = Math.min(Math.max(textWidth + 64, 120), 360);
+      anno.expectedWidth = contentWidth;
+    });
+
+    const threshold = 100; // 垂直方向的检测阈值
+
+    // 计算避让偏移
     annos.forEach((anno, i) => {
       let indent = 0;
+      // 记录当前位置已经被占用的区域
+      const occupiedRegions: Array<{ left: number; width: number }> = [];
+
+      // 检查之前的注释
       for (let j = 0; j < i; j++) {
         if (Math.abs(anno.style.top - annos[j].style.top) < threshold) {
-          indent = Math.max(indent, (annos[j].indentOffset || 0) + indentStep);
+          occupiedRegions.push({
+            left: annos[j].indentOffset || 0,
+            width: annos[j].expectedWidth || 360,
+          });
         }
       }
+
+      // 如果有重叠区域，寻找第一个可用的空间
+      if (occupiedRegions.length > 0) {
+        // 按照左边界排序
+        occupiedRegions.sort((a, b) => a.left - b.left);
+
+        // 从左到右查找可用空间
+        let testPosition = 0;
+        let found = false;
+
+        while (!found) {
+          found = true;
+          for (const region of occupiedRegions) {
+            // 检查当前位置是否与已占用区域重叠
+            if (
+              testPosition < region.left + region.width &&
+              testPosition + (anno.expectedWidth || 360) > region.left
+            ) {
+              // 发现重叠，移动到下一个可能的位置
+              testPosition = region.left + region.width + 20; // 添加间距
+              found = false;
+              break;
+            }
+          }
+          if (found) {
+            indent = testPosition;
+          }
+        }
+      }
+
       anno.indentOffset = indent;
     });
+
     return annos;
   }, [positionedAnnotations]);
 
@@ -155,7 +212,7 @@ const AnnotationViewer: React.FC<AnnotationViewerProps> = ({
             top: `${top}px`,
             left: `${left}px`,
             fontSize: 42,
-            color: "red",
+            color: "#4169E1",
             pointerEvents: "none",
             zIndex: 1100,
           }}
@@ -175,7 +232,7 @@ const AnnotationViewer: React.FC<AnnotationViewerProps> = ({
             top: `${top}px`,
             left: `${left}px`,
             fontSize: 42,
-            color: "red",
+            color: "#4169E1",
             pointerEvents: "none",
             zIndex: 1100,
           }}
@@ -192,6 +249,9 @@ const AnnotationViewer: React.FC<AnnotationViewerProps> = ({
     const markers: JSX.Element[] = [];
     const { scrollTop, scale } = viewport;
     annotations.forEach((anno) => {
+      const isHovered = hoveredAnnotationId === anno.id;
+      const faded =
+        hoveredAnnotationId !== null && hoveredAnnotationId !== anno.id;
       if (
         typeof anno.yPosition === "number" &&
         typeof anno.x1Position === "number"
@@ -206,12 +266,18 @@ const AnnotationViewer: React.FC<AnnotationViewerProps> = ({
               top: `${top}px`,
               left: `${left}px`,
               fontSize: 42,
-              color: "#d3d3d3",
-              pointerEvents: "none",
-              zIndex: 1100,
+              color: isHovered ? "#FF5722" : "#FFD700",
+              pointerEvents: "auto",
+              zIndex: isHovered ? 2000 : 1100,
+              filter: isHovered ? "drop-shadow(0 0 12px #FF5722)" : "none",
+              transition: "filter 0.2s, color 0.2s, z-index 0.2s, opacity 0.2s",
+              cursor: "pointer",
+              opacity: faded ? 0.25 : 1,
             }}
+            onMouseEnter={() => onAnnotationHover?.(anno.id!)}
+            onMouseLeave={() => onAnnotationHover?.(null)}
           >
-            「
+            {"「"}
           </div>
         );
       }
@@ -229,18 +295,31 @@ const AnnotationViewer: React.FC<AnnotationViewerProps> = ({
               top: `${top}px`,
               left: `${left}px`,
               fontSize: 42,
-              color: "#d3d3d3",
-              pointerEvents: "none",
-              zIndex: 1100,
+              color: isHovered ? "#FF5722" : "#FFD700",
+              pointerEvents: "auto",
+              zIndex: isHovered ? 2000 : 1100,
+              filter: isHovered ? "drop-shadow(0 0 12px #FF5722)" : "none",
+              transition: "filter 0.2s, color 0.2s, z-index 0.2s, opacity 0.2s",
+              cursor: "pointer",
+              opacity: faded ? 0.25 : 1,
             }}
+            onMouseEnter={() => onAnnotationHover?.(anno.id!)}
+            onMouseLeave={() => onAnnotationHover?.(null)}
           >
-            」
+            {"」"}
           </div>
         );
       }
     });
     return markers;
-  }, [annotations, viewport, leftOffset, isReadyToRender]);
+  }, [
+    annotations,
+    viewport,
+    leftOffset,
+    isReadyToRender,
+    hoveredAnnotationId,
+    onAnnotationHover,
+  ]);
 
   // 渲染文字模式
   if (displayMode === "text") {
@@ -248,6 +327,9 @@ const AnnotationViewer: React.FC<AnnotationViewerProps> = ({
       <div style={containerStyle}>
         {computedAnnotations.map((anno) => {
           const overallLeft = (wheelDelta || 0) + (anno.indentOffset || 0);
+          const isHovered = hoveredAnnotationId === anno.id;
+          const faded =
+            hoveredAnnotationId !== null && hoveredAnnotationId !== anno.id;
           return (
             <div
               key={anno.id}
@@ -256,13 +338,26 @@ const AnnotationViewer: React.FC<AnnotationViewerProps> = ({
                 ...annotationStyle,
                 left: `${overallLeft}px`,
                 top: `${anno.style.top}px`,
-                maxWidth: "360px",
-                minWidth: "240px",
-                width: "fit-content",
+                width: anno.expectedWidth
+                  ? `${anno.expectedWidth}px`
+                  : "fit-content",
                 whiteSpace: "pre-wrap",
                 wordBreak: "break-word",
+                overflowY: "auto",
+                boxShadow: isHovered
+                  ? "0 0 24px 6px #FF5722"
+                  : annotationStyle.boxShadow,
+                borderLeft: isHovered
+                  ? "6px solid #FF5722"
+                  : annotationStyle.borderLeft,
+                zIndex: isHovered ? 2000 : 1000,
+                transition:
+                  "box-shadow 0.2s, border-left 0.2s, z-index 0.2s, opacity 0.2s",
+                opacity: faded ? 0.25 : 1,
               }}
               onDoubleClick={() => handleAnnotationDoubleClick(anno.id!)}
+              onMouseEnter={() => onAnnotationHover?.(anno.id!)}
+              onMouseLeave={() => onAnnotationHover?.(null)}
             >
               <div className="annotation-content">
                 <div
@@ -302,12 +397,14 @@ const AnnotationViewer: React.FC<AnnotationViewerProps> = ({
   }
 
   // 帖子模式
+  console.log("Filtering with replyId:", replyId);
+  console.log("Annotations:", annotations);
   const filteredAnnotations = annotations.filter((annotation) => {
+    if (replyId != null) return annotation.replyId === replyId;
     if (file)
       return (
         annotation.pdfFile === file && annotation.pageNumber === currentPage
       );
-    if (replyId != null) return annotation.replyId === replyId;
     return false;
   });
 
@@ -358,7 +455,7 @@ const annotationStyle: React.CSSProperties = {
   backgroundColor: "rgba(245, 245, 245, 0.95)",
   color: "#000",
   borderLeft: "4px solid #FFC107",
-  padding: 16,
+  padding: "16px",
   borderRadius: 8,
   boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
   transition: "transform 0.15s ease-out",
@@ -368,7 +465,10 @@ const annotationStyle: React.CSSProperties = {
   fontSize: 16,
   lineHeight: 1.6,
   fontFamily: "sans-serif",
-  width: 360,
+  maxWidth: 360,
+  maxHeight: 300,
+  overflowY: "auto",
+  width: "fit-content",
 };
 
 export default AnnotationViewer;
