@@ -17,6 +17,7 @@
     "jstransformer": "^1.0.0",
     "mongoose": "^8.4.3",
     "morgan": "~1.10.0",
+    "multer": "^2.0.2",
     "mysql": "^2.18.1",
     "mysql2": "^3.10.1",
     "pdfjs-dist": "3.11.174",

@@ -26,9 +26,12 @@ app.use((req, res, next) => {
 
 // 设置静态文件服务
 app.use("/pdf", express.static(path.join(__dirname, "public", "pdf")));
+app.use("/uploads", express.static(path.join(__dirname, "public", "uploads")));
 console.log(
   "Serving static files from:",
-  path.join(__dirname, "public", "pdf")
+  path.join(__dirname, "public", "pdf"),
+  "and",
+  path.join(__dirname, "public", "uploads")
 );
 
 // 路由处理
