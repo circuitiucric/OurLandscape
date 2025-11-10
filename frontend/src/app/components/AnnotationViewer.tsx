@@ -15,6 +15,9 @@ export interface Annotation {
   x2Position?: number;
   indentOffset?: number;
   expectedWidth?: number;
+  selectedText?: string;
+  textStartOffset?: number;
+  textEndOffset?: number;
 }
 
 export interface ViewportState {
@@ -397,8 +400,6 @@ const AnnotationViewer: React.FC<AnnotationViewerProps> = ({
   }
 
   // 帖子模式
-  console.log("Filtering with replyId:", replyId);
-  console.log("Annotations:", annotations);
   const filteredAnnotations = annotations.filter((annotation) => {
     if (replyId != null) return annotation.replyId === replyId;
     if (file)
@@ -409,8 +410,7 @@ const AnnotationViewer: React.FC<AnnotationViewerProps> = ({
   });
 
   return (
-    <div>
-      <h3>Annotations</h3>
+    <div style={{ padding: "10px" }}>
       {filteredAnnotations.length === 0 ? (
         <p>No annotations for this reply.</p>
       ) : (
@@ -418,22 +418,51 @@ const AnnotationViewer: React.FC<AnnotationViewerProps> = ({
           <div
             key={annotation.id}
             style={{
-              position: "absolute",
-              top: annotation.yPosition ? `${annotation.yPosition}%` : "0",
-              backgroundColor: "#d3d3d3",
-              marginBottom: 5,
-              padding: 5,
-              borderRadius: 3,
-              cursor: "pointer",
+              backgroundColor: "#f5f5f5",
+              marginBottom: "10px",
+              padding: "12px",
+              borderRadius: "6px",
+              borderLeft: "4px solid #4CAF50",
+              position: "relative",
             }}
             onDoubleClick={() => handleAnnotationDoubleClick(annotation.id!)}
           >
-            <strong>{annotation.userName}</strong>
-            {annotation.text.split("\n").map((para, idx) => (
-              <p key={idx} style={{ margin: 0 }}>
-                {para}
-              </p>
-            ))}
+            {annotation.selectedText && (
+              <div
+                style={{
+                  backgroundColor: "#e3f2fd",
+                  padding: "8px",
+                  marginBottom: "8px",
+                  borderRadius: "4px",
+                  fontSize: "14px",
+                  color: "#333",
+                  fontStyle: "italic",
+                }}
+              >
+                {annotation.selectedText}
+              </div>
+            )}
+            <div style={{ marginBottom: "8px" }}>
+              {annotation.text.split("\n").map((para, idx) => (
+                <p key={idx} style={{ margin: "4px 0" }}>
+                  {para}
+                </p>
+              ))}
+            </div>
+            <div
+              style={{
+                fontSize: "12px",
+                color: "#666",
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+              }}
+            >
+              <span>{annotation.userName}</span>
+              {annotation.createdAt && (
+                <time>{new Date(annotation.createdAt).toLocaleString()}</time>
+              )}
+            </div>
           </div>
         ))
       )}

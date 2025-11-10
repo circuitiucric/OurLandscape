@@ -41,7 +41,77 @@ const ThreadPage = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   // 新增状态用于记录滑动条的值，取值范围 0-100，代表百分比
-  const [sliderValue, setSliderValue] = useState<number>(50);
+  // 文字选择相关状态
+  const [isSelectingText, setIsSelectingText] = useState<boolean>(false);
+  const [selectedText, setSelectedText] = useState<{
+    text: string;
+    startOffset: number;
+    endOffset: number;
+  } | null>(null);
+
+  // 计算选中文字在回复文本中的位置
+  const calculateOffsets = (
+    selection: Selection,
+    container: HTMLElement
+  ): { startOffset: number; endOffset: number } | null => {
+    try {
+      const range = selection.getRangeAt(0);
+      const preSelectionRange = range.cloneRange();
+      preSelectionRange.selectNodeContents(container);
+      preSelectionRange.setEnd(range.startContainer, range.startOffset);
+      const startOffset = preSelectionRange.toString().length;
+      
+      return {
+        startOffset,
+        endOffset: startOffset + range.toString().length,
+      };
+    } catch (e) {
+      console.error("Error calculating text offsets:", e);
+      return null;
+    }
+  };
+
+  // 处理文字选择事件
+  const handleTextSelect = (event: MouseEvent | TouchEvent) => {
+    if (!isSelectingText) return;
+    
+    const selection = window.getSelection();
+    const text = selection?.toString().trim();
+    
+    if (!text || !selection) return;
+    
+    const target = event.target as HTMLElement;
+    const replyContainer = target.closest(".reply-content") as HTMLElement;
+    
+    if (!replyContainer) return;
+    
+    const offsets = calculateOffsets(selection, replyContainer);
+    if (!offsets) return;
+    
+    setSelectedText({
+      text,
+      ...offsets,
+    });
+  };
+
+  // 监听文字选择
+  useEffect(() => {
+    if (!isSelectingText) {
+      setSelectedText(null);
+      return;
+    }
+
+    const handleMouseUp = (e: MouseEvent) => handleTextSelect(e);
+    const handleTouchEnd = (e: TouchEvent) => handleTextSelect(e);
+
+    document.addEventListener("mouseup", handleMouseUp);
+    document.addEventListener("touchend", handleTouchEnd);
+
+    return () => {
+      document.removeEventListener("mouseup", handleMouseUp);
+      document.removeEventListener("touchend", handleTouchEnd);
+    };
+  }, [isSelectingText]);
 
   // 获取线程和回复数据
   useEffect(() => {
@@ -156,19 +226,17 @@ const ThreadPage = () => {
     event: React.FormEvent<HTMLFormElement>
   ) => {
     event.preventDefault();
-    if (selectedReplyId === null) return;
+    if (selectedReplyId === null || !selectedText) return;
 
     const text = (event.target as any).elements.textarea?.value;
     if (text) {
-      // 这里新增 position_y 字段，值为 sliderValue
       const newAnnotation = {
         replyId: selectedReplyId,
         text,
-        yPosition: sliderValue,
+        selectedText: selectedText.text,
+        textStartOffset: selectedText.startOffset,
+        textEndOffset: selectedText.endOffset,
       };
-
-      // 添加日志，检查 newAnnotation
-      console.log("Submitting annotation:", newAnnotation);
 
       try {
         const response = await axios.post(
@@ -184,6 +252,8 @@ const ThreadPage = () => {
           ...prevAnnotations,
           response.data,
         ]);
+        setSelectedText(null);
+        setIsSelectingText(false);
       } catch (error) {
         console.error("Error adding annotation:", error);
       }
@@ -250,17 +320,35 @@ const ThreadPage = () => {
           {replies.map((reply) => (
             <div
               key={reply.id}
-              style={{ marginBottom: "20px", cursor: "pointer" }}
-              onClick={() => handleReplyClick(reply.id)}
+              className="reply-content"
+              style={{ 
+                marginBottom: "20px", 
+                cursor: isSelectingText ? "text" : "pointer",
+                backgroundColor: selectedReplyId === reply.id ? "#e3f2fd" : "transparent",
+                padding: "10px",
+                borderRadius: "4px",
+                userSelect: isSelectingText ? "text" : "none"
+              }}
+              onClick={(e) => {
+                if (!isSelectingText) handleReplyClick(reply.id);
+              }}
             >
-              <div>
+              <div style={{ marginBottom: "10px" }}>
                 <strong>{reply.created_by}</strong>
               </div>
               <div>
                 {reply.content.blocks.map((block, blockIndex) => (
-                  <div key={blockIndex} style={{ marginBottom: "10px" }}>
+                  <div 
+                    key={blockIndex} 
+                    style={{ marginBottom: "10px" }}
+                  >
                     {block.type === "text" ? (
-                      <div>{block.content}</div>
+                      <div style={{ 
+                        lineHeight: "1.6", 
+                        whiteSpace: "pre-wrap"
+                      }}>
+                        {block.content}
+                      </div>
                     ) : (
                       block.type === "image" &&
                       block.url && (
@@ -407,56 +495,120 @@ const ThreadPage = () => {
         style={{
           width: "300px",
           height: "100vh",
-          overflowY: "auto", // 让批注区域可滚动
+          overflowY: "auto",
           backgroundColor: "#f0f0f0",
           padding: "10px",
           position: "relative",
+          display: "flex",
+          flexDirection: "column"
         }}
       >
-        <h3>Annotations for reply {selectedReplyId}</h3>
-        <AnnotationViewer
-          annotations={annotations}
-          replyId={selectedReplyId}
-          displayMode="thread"
-        />
-
-        {/* 批注输入框 */}
-        <form
-          onSubmit={handleAnnotationSubmit}
+        {/* 批注工具栏 */}
+        <div
           style={{
-            position: "absolute",
-            bottom: 10,
-            right: 10,
-            width: "280px",
+            marginBottom: "10px",
+            display: "flex",
+            gap: "10px",
+            alignItems: "center"
           }}
         >
-          <textarea
-            name="textarea"
-            placeholder="Enter annotation text"
-            style={{
-              width: "100%",
-              height: "60px",
-              color: "black",
-              resize: "none",
-            }}
+          <h3>Annotations for reply {selectedReplyId}</h3>
+          {selectedReplyId && (
+            <button
+              onClick={() => setIsSelectingText(!isSelectingText)}
+              style={{
+                padding: "4px 8px",
+                backgroundColor: isSelectingText ? "#FF5722" : "#4CAF50",
+                color: "white",
+                border: "none",
+                borderRadius: "4px",
+                cursor: "pointer",
+                fontSize: "12px"
+              }}
+            >
+              {isSelectingText ? "取消选择" : "添加批注"}
+            </button>
+          )}
+        </div>
+
+        {/* 批注列表 */}
+        <div style={{ flex: 1, overflowY: "auto" }}>
+          <AnnotationViewer
+            annotations={annotations}
+            replyId={selectedReplyId}
+            displayMode="thread"
           />
-          {/* 新增滑动条，控制批注的垂直位置 */}
-          <div style={{ margin: "10px 0" }}>
-            <label htmlFor="positionRange">批注位置: {sliderValue}%</label>
-            <input
-              id="positionRange"
-              type="range"
-              min="0"
-              max="100"
-              value={sliderValue}
-              onChange={(e) => setSliderValue(Number(e.target.value))}
-              style={{ width: "100%" }}
+        </div>
+
+        {/* 批注输入框 */}
+        {selectedText && selectedReplyId && (
+          <form
+            onSubmit={handleAnnotationSubmit}
+            style={{
+              padding: "10px",
+              backgroundColor: "white",
+              borderTop: "1px solid #ddd",
+              marginTop: "10px"
+            }}
+          >
+            <div style={{ 
+              padding: "8px", 
+              backgroundColor: "#f5f5f5", 
+              borderRadius: "4px",
+              marginBottom: "10px",
+              fontSize: "14px"
+            }}>
+              选中文字: {selectedText.text}
+            </div>
+            <textarea
+              name="textarea"
+              placeholder="输入批注内容..."
+              style={{
+                width: "100%",
+                height: "60px",
+                padding: "8px",
+                border: "1px solid #ddd",
+                borderRadius: "4px",
+                resize: "none",
+                marginBottom: "10px"
+              }}
+              autoFocus
             />
-          </div>
-          <button type="submit" style={{ width: "100%", marginTop: "5px" }}>
-            Add Annotation
-          </button>
-        </form>
+            <div style={{ display: "flex", gap: "10px" }}>
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedText(null);
+                  setIsSelectingText(false);
+                }}
+                style={{
+                  flex: 1,
+                  padding: "8px",
+                  backgroundColor: "#f5f5f5",
+                  border: "1px solid #ddd",
+                  borderRadius: "4px",
+                  cursor: "pointer"
+                }}
+              >
+                取消
+              </button>
+              <button
+                type="submit"
+                style={{
+                  flex: 1,
+                  padding: "8px",
+                  backgroundColor: "#4CAF50",
+                  color: "white",
+                  border: "none",
+                  borderRadius: "4px",
+                  cursor: "pointer"
+                }}
+              >
+                提交批注
+              </button>
+            </div>
+          </form>
+        )}
       </div>
     </div>
   );
