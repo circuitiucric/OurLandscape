@@ -17,6 +17,9 @@ const mapAnnotationFields = (item) => ({
   x2Position: item.x2_position,
   createdAt: item.created_at,
   replyId: item.reply_id,
+  selectedText: item.selected_text,
+  textStartOffset: item.text_start_offset,
+  textEndOffset: item.text_end_offset,
 });
 
 // 获取批注列表（支持 pdfFile/replyId 筛选）
@@ -34,7 +37,10 @@ SELECT
   x1_position,
   x2_position,
   created_at, 
-  reply_id
+  reply_id,
+  selected_text,
+  text_start_offset,
+  text_end_offset
 FROM annotations WHERE 1=1
   `;
   const params = [];
@@ -74,7 +80,10 @@ router.get("/:id", async (req, res) => {
   x1_position,
   x2_position,
   created_at, 
-  reply_id
+  reply_id,
+  selected_text,
+  text_start_offset,
+  text_end_offset
 FROM annotations WHERE annotation_id = ?
 `,
       [id]
@@ -106,11 +115,14 @@ router.post("/", async (req, res) => {
       y2Position,
       x1Position,
       x2Position,
+      selectedText,
+      textStartOffset,
+      textEndOffset
     } = req.body;
 
     // 构建插入参数
-    let fields = ["text", "user_name", "position_y"];
-    let values = [text, decoded.userName, yPosition];
+    let fields = ["text", "user_name", "position_y", "selected_text", "text_start_offset", "text_end_offset"];
+    let values = [text, decoded.userName, yPosition, selectedText, textStartOffset, textEndOffset];
 
     if (pdfFile) {
       fields.push("pdf_file", "page_number");
@@ -153,6 +165,9 @@ router.post("/", async (req, res) => {
       x1Position,
       x2Position,
       replyId,
+      selectedText,
+      textStartOffset,
+      textEndOffset,
       createdAt: new Date(),
     };
     res.status(201).json(newAnnotation);
