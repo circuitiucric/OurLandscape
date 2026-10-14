@@ -34,7 +34,7 @@ const Home: React.FC = () => {
       setMessage(response.data.msg);
       if (response.data.code === 1) {
         localStorage.setItem("token", response.data.token);
-        router.push("/select-pdf");
+        router.push("/");
       }
     } catch (error) {
       console.error(error);

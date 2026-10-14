@@ -26,6 +26,19 @@ body {
     rgb(var(--background-start-rgb));
 }
 
+/* 表单控件强制使用浅色主题，避免系统深色模式下文字变白导致白底白字 */
+input,
+textarea,
+select {
+  color: #111827;
+  background-color: #ffffff;
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: #9ca3af;
+}
+
 @layer utilities {
   .text-balance {
     text-wrap: balance;

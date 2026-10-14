@@ -6,15 +6,20 @@ const indexRouter = require("./routes/index");
 const annotationsRouter = require("./routes/annotations");
 const repliesRouter = require("./routes/replies");
 const threadsRouter = require("./routes/threads"); // 添加这一行
+const resourcesRouter = require("./routes/resources");
+const noteboardsRouter = require("./routes/noteboards");
+const profileRouter = require("./routes/profile");
+const followsRouter = require("./routes/follows");
+const feedRouter = require("./routes/feed");
 
 app.use(bodyParser.urlencoded({ extended: false }));
 app.use(bodyParser.json());
 
 app.use((req, res, next) => {
   res.header("Access-Control-Allow-Origin", "*");
-  res.header("Access-Control-Allow-Headers", "Content-Type");
-  res.header("Access-Control-Allow-Methods", "*");
-  res.header("Content-Type", "application/json;charset=utf-8");
+  res.header("Access-Control-Allow-Headers", "Content-Type, Authorization");
+  res.header("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS");
+  if (req.method === "OPTIONS") return res.sendStatus(200);
   next();
 });
 
@@ -26,6 +31,7 @@ app.use((req, res, next) => {
 
 // 设置静态文件服务
 app.use("/pdf", express.static(path.join(__dirname, "public", "pdf")));
+app.use("/video", express.static(path.join(__dirname, "public", "video")));
 app.use("/uploads", express.static(path.join(__dirname, "public", "uploads")));
 console.log(
   "Serving static files from:",
@@ -39,6 +45,11 @@ app.use("/", indexRouter);
 app.use("/api/annotations", annotationsRouter);
 app.use("/api/replies", repliesRouter);
 app.use("/api/threads", threadsRouter); // 添加这一行
+app.use("/api/resources", resourcesRouter);
+app.use("/api/noteboards", noteboardsRouter);
+app.use("/api/profile", profileRouter);
+app.use("/api/follows", followsRouter);
+app.use("/api/feed", feedRouter);
 
 // 添加日志输出，以确认请求路径和文件名
 app.get("/pdf/:filename", (req, res) => {

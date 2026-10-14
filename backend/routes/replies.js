@@ -3,6 +3,22 @@ const router = express.Router();
 const db = require("../db");
 const multer = require("multer");
 const path = require("path");
+const jwt = require("jsonwebtoken");
+require("dotenv").config();
+const jwtSecret = process.env.JWT_SECRET;
+
+// 鉴权中间件：要求合法 token，将 userName 注入 req.user
+function requireAuth(req, res, next) {
+  const token = req.headers.authorization?.split(" ")[1];
+  if (!token) return res.status(401).json({ error: "Unauthorized" });
+  try {
+    const decoded = jwt.verify(token, jwtSecret);
+    req.user = { userName: decoded.userName };
+    next();
+  } catch {
+    return res.status(401).json({ error: "Invalid token" });
+  }
+}
 
 // 配置 multer 存储
 const storage = multer.diskStorage({
@@ -42,34 +58,43 @@ router.post("/upload", upload.single("image"), (req, res) => {
   res.json({ url: imageUrl });
 });
 
-// POST /api/replies - 创建新回复
-router.post("/", async (req, res) => {
-  const { thread_id, content, created_by } = req.body;
+// POST /api/replies - 创建新回复（需登录，作者强制取自 token）
+router.post("/", requireAuth, async (req, res) => {
+  const { thread_id, content, source_selection, visibility_level } = req.body;
+  const created_by = req.user.userName;
 
-  if (!thread_id || !content || !created_by) {
+  if (!thread_id || !content) {
     return res.status(400).json({ error: "Missing required fields" });
   }
 
-  // 确保 content 是有效的 JSON 格式
   let contentJson;
   if (typeof content === "string") {
-    // 如果是纯文本,转换为块格式
-    contentJson = {
-      blocks: [
-        {
-          type: "text",
-          content: content,
-        },
-      ],
-    };
+    contentJson = { blocks: [{ type: "text", content: content }] };
   } else {
     contentJson = content;
   }
 
+  const sourceSelectionStr = source_selection
+    ? (typeof source_selection === "string" ? source_selection : JSON.stringify(source_selection))
+    : null;
+
   try {
+    // 确定 root_thread_id：根帖子（root_thread_id IS NULL）用自身 id，子帖子继承
+    const [threadRows] = await db.query(
+      "SELECT id, root_thread_id FROM threads WHERE id = ?",
+      [thread_id]
+    );
+    const parentThread = threadRows[0];
+    const rootThreadId = parentThread
+      ? (parentThread.root_thread_id !== null ? parentThread.root_thread_id : parentThread.id)
+      : null;
+
+    const vLevel = (visibility_level === 0 || visibility_level === 1 || visibility_level === 2)
+      ? visibility_level : 2;
+
     const [result] = await db.query(
-      "INSERT INTO replies (thread_id, content, created_by) VALUES (?, ?, ?)",
-      [thread_id, JSON.stringify(contentJson), created_by]
+      "INSERT INTO replies (thread_id, content, created_by, source_selection, root_thread_id, visibility_level) VALUES (?, ?, ?, ?, ?, ?)",
+      [thread_id, JSON.stringify(contentJson), created_by, sourceSelectionStr, rootThreadId, vLevel]
     );
     res.status(201).json({ success: true, replyId: result.insertId });
   } catch (error) {

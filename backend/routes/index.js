@@ -83,7 +83,7 @@ app.post("/login", (req, res) => {
       // 确保 payload 包含 userName
       const payload = { userName: result[0].userName };
       const token = jwt.sign(payload, jwtSecret, {
-        expiresIn: "1h",
+        expiresIn: "7d",
         algorithm: "HS256",
       });
       console.log("Generated token with payload:", payload, "Token:", token); // 打印调试信息
